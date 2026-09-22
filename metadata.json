@@ -1,0 +1,6 @@
+{
+  "name": "KASIRKU",
+  "description": "Modern Point of Sale (POS) and inventory management system with real-time cashier checkout, product catalog, sales history, and analytics dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
