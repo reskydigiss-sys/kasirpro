@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppTheme } from '../types';
+import { AppTheme, User } from '../types';
 import { DatabaseStatus } from '../services/api';
 
 interface SettingsViewProps {
@@ -8,6 +8,8 @@ interface SettingsViewProps {
   onResetData: () => void;
   dbStatus?: DatabaseStatus | null;
   onRefreshDbStatus?: () => void;
+  currentUser?: User | null;
+  onOpenAuthModal?: (tab?: 'login' | 'register' | 'monitor') => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -15,19 +17,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onThemeChange,
   onResetData,
   dbStatus,
-  onRefreshDbStatus
+  onRefreshDbStatus,
+  currentUser,
+  onOpenAuthModal
 }) => {
   const isDark = theme === 'glacier-dark';
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
-  const [storeName, setStoreName] = useState('KASIRKU STORE');
+  const [storeName, setStoreName] = useState(currentUser?.storeName || 'KASIRKU STORE');
   const [storeAddress, setStoreAddress] = useState('Jl. Jend. Sudirman Kav. 24, Jakarta');
   const [storePhone, setStorePhone] = useState('0812-3456-7890');
-  const [activeCashier, setActiveCashier] = useState('Andi');
+  const [activeCashier, setActiveCashier] = useState(currentUser?.name || 'Andi');
   const [receiptFooter, setReceiptFooter] = useState(
     'Terima kasih atas kunjungan Anda! Silakan datang kembali.'
   );
   const [savedNotice, setSavedNotice] = useState(false);
+
+  const currentSlug = currentUser?.slug || 'admin';
+  const uniqueUrl = `${window.location.origin}${window.location.pathname}?u=${currentSlug}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(uniqueUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   const handleManualSync = async () => {
     setIsRefreshing(true);
@@ -53,10 +67,121 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+        {/* Account Credentials & Unique Store Page */}
+        <div
+          id="settings-account-credentials"
+          className={`p-6 rounded-xl border space-y-4 ${
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/20">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  isDark ? 'bg-sky-500/20 text-sky-300' : 'bg-blue-100 text-blue-600'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[24px]">verified_user</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">
+                  Kredensial Akun &amp; Halaman Unik Toko
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Setiap akun pengguna memiliki URL unik dan data terisolasi di database Turso.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onOpenAuthModal && (
+                <>
+                  <button
+                    id="btn-settings-monitor"
+                    type="button"
+                    onClick={() => onOpenAuthModal('monitor')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+                      isDark
+                        ? 'bg-slate-900 border-sky-400/20 text-sky-300 hover:bg-sky-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>Pantau Semua Toko</span>
+                  </button>
+
+                  <button
+                    id="btn-settings-create-account"
+                    type="button"
+                    onClick={() => onOpenAuthModal('register')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">person_add</span>
+                    <span>Buat Akun Baru</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div
+            className={`p-4 rounded-xl border font-mono text-xs space-y-2.5 ${
+              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/20">
+              <span className="text-slate-500 font-sans">Nama Akun / Toko:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 font-sans">
+                {currentUser?.storeName || 'KASIRKU STORE'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/20">
+              <span className="text-slate-500 font-sans">Pemilik &amp; Role:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 font-sans">
+                {currentUser?.name || 'Admin Kasirku'} ({currentUser?.role || 'Owner'})
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/20">
+              <span className="text-slate-500 font-sans">Username Kredensial:</span>
+              <span className="font-semibold text-sky-500 dark:text-sky-400 font-mono">
+                @{currentUser?.username || 'admin'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/20">
+              <span className="text-slate-500 font-sans">Tautan Halaman Unik:</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono truncate max-w-[200px] sm:max-w-none">
+                  ?u={currentSlug}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="px-2 py-0.5 rounded text-[11px] bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 flex items-center gap-1 font-sans cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {copiedLink ? 'check' : 'content_copy'}
+                  </span>
+                  <span>{copiedLink ? 'Tersalin' : 'Salin URL'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center py-1">
+              <span className="text-slate-500 font-sans">Pengguna Terdaftar di Database:</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300 font-sans">
+                {dbStatus?.usersCount || 2} akun toko aktif
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Store Profile */}
         <div
           className={`p-6 rounded-xl border space-y-4 ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">
@@ -72,7 +197,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setStoreName(e.target.value)}
                 className={`w-full px-3.5 py-2 text-sm rounded-lg border outline-none ${
                   isDark
-                    ? 'bg-slate-900 border-sky-400/20 text-slate-100 focus:border-sky-400'
+                    ? 'bg-slate-900 border-slate-700 text-slate-100 focus:border-blue-500'
                     : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
                 }`}
               />
@@ -86,7 +211,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setStorePhone(e.target.value)}
                 className={`w-full px-3.5 py-2 text-sm rounded-lg border outline-none ${
                   isDark
-                    ? 'bg-slate-900 border-sky-400/20 text-slate-100 focus:border-sky-400'
+                    ? 'bg-slate-900 border-slate-700 text-slate-100 focus:border-blue-500'
                     : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
                 }`}
               />
@@ -100,7 +225,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setStoreAddress(e.target.value)}
                 className={`w-full px-3.5 py-2 text-sm rounded-lg border outline-none ${
                   isDark
-                    ? 'bg-slate-900 border-sky-400/20 text-slate-100 focus:border-sky-400'
+                    ? 'bg-slate-900 border-slate-700 text-slate-100 focus:border-blue-500'
                     : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
                 }`}
               />
@@ -114,7 +239,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setReceiptFooter(e.target.value)}
                 className={`w-full px-3.5 py-2 text-sm rounded-lg border outline-none ${
                   isDark
-                    ? 'bg-slate-900 border-sky-400/20 text-slate-100 focus:border-sky-400'
+                    ? 'bg-slate-900 border-slate-700 text-slate-100 focus:border-blue-500'
                     : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
                 }`}
               />
@@ -125,7 +250,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Operational / Cashier */}
         <div
           className={`p-6 rounded-xl border space-y-4 ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">
@@ -140,7 +265,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onChange={(e) => setActiveCashier(e.target.value)}
               className={`w-full px-3.5 py-2 text-sm rounded-lg border outline-none ${
                 isDark
-                  ? 'bg-slate-900 border-sky-400/20 text-slate-100 focus:border-sky-400'
+                  ? 'bg-slate-900 border-slate-700 text-slate-100 focus:border-blue-500'
                   : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
               }`}
             />
@@ -150,7 +275,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Database Turso Section */}
         <div
           className={`p-6 rounded-xl border space-y-4 ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -250,21 +375,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Theme Settings */}
         <div
           className={`p-6 rounded-xl border space-y-4 ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">
-            Tampilan &amp; Tema (Glacier vs Corporate)
+            Tampilan &amp; Tema (Terang vs Gelap)
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               type="button"
               onClick={() => onThemeChange('corporate-light')}
-              className={`p-4 rounded-xl border flex items-center gap-3 text-left transition-all ${
+              className={`p-4 rounded-xl border flex items-center gap-3 text-left transition-colors cursor-pointer ${
                 theme === 'corporate-light'
-                  ? 'border-blue-600 bg-blue-50/50 shadow-sm'
-                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-white/5'
+                  ? 'border-blue-600 bg-blue-50/50 shadow-xs'
+                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
               }`}
             >
               <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
@@ -272,7 +397,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
               <div>
                 <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                  Corporate Light
+                  Enterprise Light
                 </p>
                 <p className="text-xs text-slate-500">
                   Bersih, profesional, standar kasir retail harian
@@ -283,21 +408,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => onThemeChange('glacier-dark')}
-              className={`p-4 rounded-xl border flex items-center gap-3 text-left transition-all ${
+              className={`p-4 rounded-xl border flex items-center gap-3 text-left transition-colors cursor-pointer ${
                 theme === 'glacier-dark'
-                  ? 'border-sky-400 bg-sky-950/40 shadow-[0_0_15px_rgba(125,211,252,0.15)]'
-                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-white/5'
+                  ? 'border-blue-500 bg-slate-900 shadow-xs'
+                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
               }`}
             >
-              <div className="w-10 h-10 rounded-lg bg-sky-950 border border-sky-400/40 text-sky-300 flex items-center justify-center font-bold">
-                ❄️
+              <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center font-bold">
+                🌙
               </div>
               <div>
                 <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                  Glacier Glassmorphism
+                  Enterprise Dark
                 </p>
                 <p className="text-xs text-slate-500">
-                  Mode gelap futuristik dengan efek kaca &amp; neon cyan
+                  Mode gelap solid, nyaman di mata untuk operasional malam
                 </p>
               </div>
             </button>

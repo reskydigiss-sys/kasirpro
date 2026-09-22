@@ -55,3 +55,20 @@ export type ActiveTab =
   | 'pengaturan';
 
 export type AppTheme = 'corporate-light' | 'glacier-dark';
+
+export interface User {
+  id: string;
+  username: string;
+  name: string;
+  storeName: string;
+  slug: string;
+  role: string;
+  category?: string;
+  avatar?: string;
+  createdAt?: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+}

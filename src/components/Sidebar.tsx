@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveTab, AppTheme } from '../types';
+import { ActiveTab, AppTheme, User } from '../types';
 import { USER_AVATAR_LIGHT, USER_AVATAR_DARK } from '../data/mockData';
 
 interface SidebarProps {
@@ -9,6 +9,8 @@ interface SidebarProps {
   mobileOpen: boolean;
   onCloseMobile: () => void;
   lowStockCount: number;
+  currentUser?: User | null;
+  onOpenAuthModal?: (tab?: 'login' | 'register' | 'monitor') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -17,7 +19,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   theme,
   mobileOpen,
   onCloseMobile,
-  lowStockCount
+  lowStockCount,
+  currentUser,
+  onOpenAuthModal
 }) => {
   const isDark = theme === 'glacier-dark';
 
@@ -54,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } ${
           isDark
-            ? 'bg-[#0f1524]/90 backdrop-blur-xl border-r border-sky-400/15 text-slate-100 shadow-[0_0_30px_rgba(125,211,252,0.05)]'
+            ? 'bg-[#0b0f19] border-r border-slate-800 text-slate-100'
             : 'bg-white border-r border-slate-200 text-slate-800'
         }`}
       >
@@ -62,37 +66,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           id="sidebar-brand"
           className={`px-6 py-5 border-b flex items-center gap-3 ${
-            isDark ? 'border-sky-400/10' : 'border-slate-100'
+            isDark ? 'border-slate-800/80 bg-[#0d1322]' : 'border-slate-100 bg-slate-50/50'
           }`}
         >
-          {isDark ? (
-            <div className="w-10 h-10 rounded-full p-0.5 border border-sky-400/30 bg-sky-950/50 flex items-center justify-center shadow-[0_0_15px_rgba(125,211,252,0.2)]">
-              <img
-                src={USER_AVATAR_DARK}
-                alt="Kasirku Logo"
-                className="w-full h-full rounded-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-              <span className="material-symbols-outlined text-[26px]">storefront</span>
-            </div>
-          )}
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+            <span className="material-symbols-outlined text-[24px]">point_of_sale</span>
+          </div>
 
           <div className="flex-1 min-w-0">
             <h1
-              className={`font-bold tracking-tight text-xl leading-none ${
-                isDark ? 'text-sky-300 text-glow' : 'text-blue-600'
+              className={`font-display font-extrabold tracking-tight text-lg leading-tight ${
+                isDark ? 'text-white' : 'text-slate-900'
               }`}
             >
               KASIRKU
             </h1>
-            <p
-              className={`text-xs mt-1 font-medium ${
-                isDark ? 'text-slate-400' : 'text-slate-400'
-              }`}
-            >
-              {isDark ? 'Admin Terminal' : 'Operational Center'}
+            <p className="text-[11px] font-medium text-slate-400 truncate">
+              {isDark ? 'Terminal Operasional' : 'Sistem POS & Kasir'}
             </p>
           </div>
         </div>
@@ -109,25 +99,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onTabChange(item.id);
                   onCloseMobile();
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer text-left active:scale-[0.98] ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 cursor-pointer text-left ${
                   isActive
                     ? isDark
-                      ? 'bg-sky-400/15 text-sky-300 border-l-4 border-sky-400 shadow-[0_0_15px_rgba(125,211,252,0.15)]'
-                      : 'bg-blue-600 text-white shadow-sm'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-blue-600 text-white shadow-xs'
                     : isDark
-                    ? 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                    ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span
-                  className={`material-symbols-outlined text-[22px] ${
-                    isActive && !isDark ? 'fill' : ''
+                  className={`material-symbols-outlined text-[20px] ${
+                    isActive ? 'fill' : ''
                   }`}
-                  style={
-                    isActive && isDark
-                      ? { fontVariationSettings: "'FILL' 1" }
-                      : undefined
-                  }
                 >
                   {item.icon}
                 </span>
@@ -136,8 +121,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span
                     className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
                       isDark
-                        ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                        : 'bg-red-100 text-red-600'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        : 'bg-rose-100 text-rose-700'
                     }`}
                   >
                     {item.badge}
@@ -151,25 +136,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Profile Footer */}
         <div
           id="sidebar-footer-profile"
-          className={`p-4 border-t ${
-            isDark ? 'border-sky-400/10 bg-[#0a0e1a]/40' : 'border-slate-100 bg-slate-50/50'
+          onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
+          className={`p-3 mx-3 mb-3 rounded-xl border cursor-pointer transition-colors ${
+            isDark
+              ? 'border-slate-800 bg-[#111726] hover:bg-[#161f33] hover:border-slate-700'
+              : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
           }`}
+          title="Klik untuk Masuk, Buat Akun Baru, atau Pantau Toko"
         >
-          <div className="flex items-center gap-3">
-            <img
-              src={isDark ? USER_AVATAR_DARK : USER_AVATAR_LIGHT}
-              alt="Admin User Avatar"
-              className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-sky-400/30"
-            />
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-white border border-slate-200 dark:border-slate-700">
+              {currentUser?.avatar ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <img
+                  src={isDark ? USER_AVATAR_DARK : USER_AVATAR_LIGHT}
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                Admin User
+              <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                {currentUser?.storeName || 'KASIRKU STORE'}
               </p>
-              <p className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Manager
+              <p className="text-[11px] font-mono text-slate-400 truncate">
+                @{currentUser?.username || 'admin'} • {currentUser?.role || 'Owner'}
               </p>
             </div>
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Online" />
+            <span className="material-symbols-outlined text-[18px] text-slate-400">
+              swap_horiz
+            </span>
           </div>
         </div>
       </aside>

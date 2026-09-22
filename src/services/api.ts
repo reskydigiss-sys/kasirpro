@@ -1,4 +1,4 @@
-import { Product, Transaction } from '../types';
+import { Product, Transaction, User } from '../types';
 
 export interface DatabaseStatus {
   status: 'connected' | 'error' | 'connecting';
@@ -7,7 +7,14 @@ export interface DatabaseStatus {
   latency?: string;
   productsCount?: number;
   transactionsCount?: number;
+  usersCount?: number;
   message?: string;
+}
+
+export interface UserStoreStats {
+  productsCount: number;
+  transactionsCount: number;
+  totalRevenue: number;
 }
 
 export const api = {
@@ -24,17 +31,74 @@ export const api = {
     }
   },
 
-  async getProducts(): Promise<Product[]> {
-    const res = await fetch('/api/products');
+  // Authentication & Users
+  async login(credentials: { username: string; password: string }): Promise<{ user: User }> {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Gagal masuk ke akun');
+    }
+    return data;
+  },
+
+  async register(data: {
+    username: string;
+    password: string;
+    name: string;
+    storeName: string;
+    category?: string;
+  }): Promise<{ user: User }> {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      throw new Error(result.error || 'Gagal mendaftar akun baru');
+    }
+    return result;
+  },
+
+  async getUsers(): Promise<User[]> {
+    try {
+      const res = await fetch('/api/auth/users');
+      if (!res.ok) throw new Error('Gagal memuat daftar pengguna');
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not load users list:', e);
+      return [];
+    }
+  },
+
+  async getUserBySlug(slug: string): Promise<{ user: User; stats: UserStoreStats }> {
+    const res = await fetch(`/api/users/${encodeURIComponent(slug)}`);
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Toko tidak ditemukan');
+    }
+    return data;
+  },
+
+  // Products (scoped by store slug)
+  async getProducts(slug: string = 'admin'): Promise<Product[]> {
+    const res = await fetch(`/api/products?slug=${encodeURIComponent(slug)}`);
     if (!res.ok) throw new Error('Gagal memuat produk dari Turso');
     return await res.json();
   },
 
-  async createProduct(product: Omit<Product, 'id'> & { id?: string }): Promise<Product> {
+  async createProduct(
+    product: Omit<Product, 'id'> & { id?: string },
+    slug: string = 'admin'
+  ): Promise<Product> {
     const res = await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(product)
+      body: JSON.stringify({ ...product, storeSlug: slug })
     });
     if (!res.ok) throw new Error('Gagal menyimpan produk ke Turso');
     return await res.json();
@@ -67,17 +131,21 @@ export const api = {
     return await res.json();
   },
 
-  async getTransactions(): Promise<Transaction[]> {
-    const res = await fetch('/api/transactions');
+  // Transactions (scoped by store slug)
+  async getTransactions(slug: string = 'admin'): Promise<Transaction[]> {
+    const res = await fetch(`/api/transactions?slug=${encodeURIComponent(slug)}`);
     if (!res.ok) throw new Error('Gagal memuat riwayat transaksi dari Turso');
     return await res.json();
   },
 
-  async createTransaction(tx: Omit<Transaction, 'id'> & { id?: string }): Promise<Transaction> {
+  async createTransaction(
+    tx: Omit<Transaction, 'id'> & { id?: string },
+    slug: string = 'admin'
+  ): Promise<Transaction> {
     const res = await fetch('/api/transactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tx)
+      body: JSON.stringify({ ...tx, storeSlug: slug })
     });
     if (!res.ok) throw new Error('Gagal memproses transaksi ke Turso');
     return await res.json();
@@ -88,3 +156,4 @@ export const api = {
     if (!res.ok) throw new Error('Gagal mereset database Turso');
   }
 };
+

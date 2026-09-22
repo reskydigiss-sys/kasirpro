@@ -244,7 +244,23 @@ async function initDatabase() {
   try {
     console.log('Connecting to Turso Database at:', TURSO_URL);
 
-    // Create products table
+    // 1. Create users table
+    await turso.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        store_name TEXT NOT NULL,
+        slug TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'Owner',
+        category TEXT DEFAULT 'Retail',
+        avatar TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 2. Create products table
     await turso.execute(`
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
@@ -255,11 +271,12 @@ async function initDatabase() {
         stock INTEGER NOT NULL,
         image_url TEXT,
         description TEXT,
+        store_slug TEXT DEFAULT 'admin',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // Create transactions table
+    // 3. Create transactions table
     await turso.execute(`
       CREATE TABLE IF NOT EXISTS transactions (
         id TEXT PRIMARY KEY,
@@ -276,9 +293,64 @@ async function initDatabase() {
         status TEXT NOT NULL,
         customer_name TEXT,
         items_json TEXT NOT NULL,
+        store_slug TEXT DEFAULT 'admin',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Safely add store_slug column if tables already existed without it
+    try {
+      await turso.execute(`ALTER TABLE products ADD COLUMN store_slug TEXT DEFAULT 'admin'`);
+    } catch (e) {
+      // Column already exists
+    }
+    try {
+      await turso.execute(`ALTER TABLE transactions ADD COLUMN store_slug TEXT DEFAULT 'admin'`);
+    } catch (e) {
+      // Column already exists
+    }
+
+    // 4. Seed default users if users table is empty
+    const userCountRes = await turso.execute('SELECT COUNT(*) as count FROM users');
+    const userCount = Number(userCountRes.rows[0]?.count || 0);
+
+    if (userCount === 0) {
+      console.log('Seeding initial users into Turso Database...');
+      // Admin account
+      await turso.execute({
+        sql: `INSERT INTO users (id, username, password, name, store_name, slug, role, category, avatar)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          'usr-admin',
+          'admin',
+          'password123',
+          'Admin Kasirku',
+          'KASIRKU STORE',
+          'admin',
+          'Owner',
+          'Retail & Minimarket',
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuBz59inFDaXkQSFLwfIWoDmbUKWHzrOQW4PdzQ37UmvAl5R00W5n2YT6QQHpPcrkM6G2RvPUJsWiFmfOtAUCGq6DhIQOJK3wJxrHcdn6i1pYcASrpoqCiRfse-eywMz4h639k09u0puKqo5hPLIXMzw0a3NLrz05-habUnNAfZVeJdcs0V7y4_z7LJQgyXbQ5BsxcJixl9QIN1kLgl370w0-wwX3vEE_u5unOv8i5RZ0Q8O8hcX9ScOLg'
+        ]
+      });
+
+      // Toko Berkah demo account
+      await turso.execute({
+        sql: `INSERT INTO users (id, username, password, name, store_name, slug, role, category, avatar)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          'usr-tokoberkah',
+          'tokoberkah',
+          'berkah123',
+          'Haji Budi',
+          'Toko Berkah Sejahtera',
+          'tokoberkah',
+          'Owner',
+          'Alat Tulis & Fotocopy',
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuD307Wtg4hA3lgWmU_BWQc7Fbwz_x1JmAzlB4oto-57dzfcipfCzNzMBFZzKMR6hk3OVL_nDwvMmKkcGa6QmNokVFr0_TwTDQPPGEwfaitjoV7tHz4gbk8c-9pK1tgs86dd2Xr9NWQ_0E_Sgd1M26xipV6oxdc-CuHZP7xJdtU-tervU3ZQuvFOLVsPHzVinYcZDkVXOsOd0FRLEwFvBT8TpQUfDCCiJ4Obmo576duRmqaK_muZZEkP8Q'
+        ]
+      });
+      console.log('Seeded initial users successfully.');
+    }
 
     // Check if products table is empty
     const prodCountRes = await turso.execute('SELECT COUNT(*) as count FROM products');
@@ -288,8 +360,8 @@ async function initDatabase() {
       console.log('Seeding initial products into Turso Database...');
       for (const p of DEFAULT_PRODUCTS) {
         await turso.execute({
-          sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description, store_slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             p.id,
             p.name,
@@ -298,10 +370,64 @@ async function initDatabase() {
             p.price,
             p.stock,
             p.imageUrl,
-            p.description
+            p.description,
+            'admin'
           ]
         });
       }
+
+      // Starter products for Toko Berkah
+      const BERKAH_STARTER = [
+        {
+          id: 'tb-1',
+          name: 'Kertas HVS A4 Sinar Dunia 75gr',
+          sku: 'TB-001',
+          category: 'Alat Tulis',
+          price: 52000,
+          stock: 35,
+          imageUrl: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=500&auto=format&fit=crop&q=60',
+          description: 'Kertas HVS putih bersih ukuran A4 isi 500 lembar'
+        },
+        {
+          id: 'tb-2',
+          name: 'Map Folio Kancing Plastik',
+          sku: 'TB-002',
+          category: 'Alat Tulis',
+          price: 4000,
+          stock: 150,
+          imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=60',
+          description: 'Map dokumen kancing tahan air'
+        },
+        {
+          id: 'tb-3',
+          name: 'Stapler Joyko HD-10 + Isi',
+          sku: 'TB-003',
+          category: 'Alat Tulis',
+          price: 18500,
+          stock: 40,
+          imageUrl: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=500&auto=format&fit=crop&q=60',
+          description: 'Stapler kantor praktis dan kuat'
+        }
+      ];
+
+      for (const p of BERKAH_STARTER) {
+        await turso.execute({
+          sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description, store_slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            p.id,
+            p.name,
+            p.sku,
+            p.category,
+            p.price,
+            p.stock,
+            p.imageUrl,
+            p.description,
+            'tokoberkah'
+          ]
+        });
+      }
+
       console.log('Seeded products successfully.');
     }
 
@@ -313,8 +439,8 @@ async function initDatabase() {
       console.log('Seeding initial transactions into Turso Database...');
       for (const t of DEFAULT_TRANSACTIONS) {
         await turso.execute({
-          sql: `INSERT INTO transactions (id, timestamp, date_formatted, subtotal, discount, tax, total, payment_method, amount_paid, change, cashier_name, status, customer_name, items_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          sql: `INSERT INTO transactions (id, timestamp, date_formatted, subtotal, discount, tax, total, payment_method, amount_paid, change, cashier_name, status, customer_name, items_json, store_slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             t.id,
             t.timestamp,
@@ -329,14 +455,15 @@ async function initDatabase() {
             t.cashier_name,
             t.status,
             t.customer_name,
-            t.items_json
+            t.items_json,
+            'admin'
           ]
         });
       }
       console.log('Seeded transactions successfully.');
     }
 
-    console.log('Turso Database schema and data verified successfully.');
+    console.log('Turso Database schema and multi-user data verified successfully.');
   } catch (error) {
     console.error('Error initializing Turso Database:', error);
   }
@@ -355,6 +482,7 @@ app.get('/api/status', async (req, res) => {
 
     const prodCountRes = await turso.execute('SELECT COUNT(*) as count FROM products');
     const txCountRes = await turso.execute('SELECT COUNT(*) as count FROM transactions');
+    const userCountRes = await turso.execute('SELECT COUNT(*) as count FROM users');
 
     res.json({
       status: 'connected',
@@ -362,7 +490,8 @@ app.get('/api/status', async (req, res) => {
       host: 'mycasir3-reskydigiss-sys.aws-ap-northeast-1.turso.io',
       latency: `${latency}ms`,
       productsCount: Number(prodCountRes.rows[0]?.count || 0),
-      transactionsCount: Number(txCountRes.rows[0]?.count || 0)
+      transactionsCount: Number(txCountRes.rows[0]?.count || 0),
+      usersCount: Number(userCountRes.rows[0]?.count || 0)
     });
   } catch (error: any) {
     res.status(500).json({
@@ -372,10 +501,267 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// 2. Get All Products
+// ----------------------------------------------------
+// AUTH & MULTI-USER STORE ROUTES
+// ----------------------------------------------------
+
+// Register New User / Store
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password, name, storeName, category } = req.body;
+
+    if (!username || !password || !name || !storeName) {
+      return res.status(400).json({
+        error: 'Semua kolom (Username, Password, Nama, Nama Toko) wajib diisi'
+      });
+    }
+
+    const cleanUsername = String(username).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
+    if (cleanUsername.length < 3) {
+      return res.status(400).json({
+        error: 'Username minimal 3 karakter (hanya huruf, angka, tanda strip)'
+      });
+    }
+
+    if (String(password).length < 4) {
+      return res.status(400).json({
+        error: 'Password minimal 4 karakter'
+      });
+    }
+
+    // Check if username or slug exists
+    const existing = await turso.execute({
+      sql: 'SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(slug) = LOWER(?)',
+      args: [cleanUsername, cleanUsername]
+    });
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({
+        error: `Username "${cleanUsername}" sudah digunakan. Silakan pilih username lain.`
+      });
+    }
+
+    const userId = `usr-${Date.now()}`;
+    const slug = cleanUsername;
+    const userCategory = category || 'Retail & Minimarket';
+    const avatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${cleanUsername}`;
+
+    // Insert new user into Turso
+    await turso.execute({
+      sql: `INSERT INTO users (id, username, password, name, store_name, slug, role, category, avatar)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        userId,
+        cleanUsername,
+        String(password),
+        name.trim(),
+        storeName.trim(),
+        slug,
+        'Owner',
+        userCategory,
+        avatar
+      ]
+    });
+
+    // Provide 4 starter products tailored for this new store
+    const starterProducts = [
+      {
+        id: `prd-${slug}-1`,
+        name: 'Produk Unggulan 1',
+        sku: `${slug.slice(0, 3).toUpperCase()}-001`,
+        category: 'Makanan',
+        price: 15000,
+        stock: 50,
+        imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
+        description: 'Produk contoh untuk memulai toko Anda'
+      },
+      {
+        id: `prd-${slug}-2`,
+        name: 'Minuman Segar Dingin',
+        sku: `${slug.slice(0, 3).toUpperCase()}-002`,
+        category: 'Minuman',
+        price: 8000,
+        stock: 100,
+        imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60',
+        description: 'Minuman pelepas dahaga'
+      },
+      {
+        id: `prd-${slug}-3`,
+        name: 'Paket Spesial Toko',
+        sku: `${slug.slice(0, 3).toUpperCase()}-003`,
+        category: 'Lainnya',
+        price: 35000,
+        stock: 25,
+        imageUrl: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500&auto=format&fit=crop&q=60',
+        description: 'Paket hemat untuk pelanggan setia'
+      }
+    ];
+
+    for (const p of starterProducts) {
+      await turso.execute({
+        sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description, store_slug)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          p.id,
+          p.name,
+          p.sku,
+          p.category,
+          p.price,
+          p.stock,
+          p.imageUrl,
+          p.description,
+          slug
+        ]
+      });
+    }
+
+    const newUser = {
+      id: userId,
+      username: cleanUsername,
+      name: name.trim(),
+      storeName: storeName.trim(),
+      slug,
+      role: 'Owner',
+      category: userCategory,
+      avatar
+    };
+
+    res.status(201).json({ user: newUser });
+  } catch (error: any) {
+    console.error('Error registering user:', error);
+    res.status(500).json({ error: error.message || 'Gagal mendaftarkan pengguna baru' });
+  }
+});
+
+// Login User
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username dan password wajib diisi' });
+    }
+
+    const cleanUsername = String(username).toLowerCase().trim();
+
+    const result = await turso.execute({
+      sql: 'SELECT * FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1',
+      args: [cleanUsername]
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Username tidak ditemukan' });
+    }
+
+    const row = result.rows[0];
+    if (String(row.password) !== String(password)) {
+      return res.status(401).json({ error: 'Password salah' });
+    }
+
+    const user = {
+      id: String(row.id),
+      username: String(row.username),
+      name: String(row.name),
+      storeName: String(row.store_name),
+      slug: String(row.slug),
+      role: String(row.role || 'Owner'),
+      category: row.category ? String(row.category) : 'Retail & Minimarket',
+      avatar: row.avatar ? String(row.avatar) : undefined
+    };
+
+    res.json({ user });
+  } catch (error: any) {
+    console.error('Error in login:', error);
+    res.status(500).json({ error: error.message || 'Gagal masuk akun' });
+  }
+});
+
+// List all stores / users for monitoring
+app.get('/api/auth/users', async (req, res) => {
+  try {
+    const result = await turso.execute(
+      'SELECT id, username, name, store_name, slug, role, category, avatar, created_at FROM users ORDER BY created_at ASC'
+    );
+
+    const users = result.rows.map((row) => ({
+      id: String(row.id),
+      username: String(row.username),
+      name: String(row.name),
+      storeName: String(row.store_name),
+      slug: String(row.slug),
+      role: String(row.role || 'Owner'),
+      category: row.category ? String(row.category) : 'Retail',
+      avatar: row.avatar ? String(row.avatar) : undefined,
+      createdAt: row.created_at ? String(row.created_at) : undefined
+    }));
+
+    res.json(users);
+  } catch (error: any) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single user / store details by slug (Unique Store Page Data)
+app.get('/api/users/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const cleanSlug = String(slug).toLowerCase().trim();
+
+    const userRes = await turso.execute({
+      sql: 'SELECT id, username, name, store_name, slug, role, category, avatar, created_at FROM users WHERE LOWER(slug) = LOWER(?) OR LOWER(username) = LOWER(?) LIMIT 1',
+      args: [cleanSlug, cleanSlug]
+    });
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Halaman toko atau pengguna tidak ditemukan' });
+    }
+
+    const row = userRes.rows[0];
+    const user = {
+      id: String(row.id),
+      username: String(row.username),
+      name: String(row.name),
+      storeName: String(row.store_name),
+      slug: String(row.slug),
+      role: String(row.role || 'Owner'),
+      category: row.category ? String(row.category) : 'Retail',
+      avatar: row.avatar ? String(row.avatar) : undefined
+    };
+
+    // Calculate store stats
+    const prodCountRes = await turso.execute({
+      sql: 'SELECT COUNT(*) as count FROM products WHERE store_slug = ?',
+      args: [user.slug]
+    });
+    const txCountRes = await turso.execute({
+      sql: 'SELECT COUNT(*) as count, SUM(total) as revenue FROM transactions WHERE store_slug = ?',
+      args: [user.slug]
+    });
+
+    res.json({
+      user,
+      stats: {
+        productsCount: Number(prodCountRes.rows[0]?.count || 0),
+        transactionsCount: Number(txCountRes.rows[0]?.count || 0),
+        totalRevenue: Number(txCountRes.rows[0]?.revenue || 0)
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching user store page:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Get All Products (Scoped by store slug)
 app.get('/api/products', async (req, res) => {
   try {
-    const result = await turso.execute('SELECT * FROM products ORDER BY id ASC');
+    const slug = (req.query.slug as string) || (req.query.store as string) || 'admin';
+    const result = await turso.execute({
+      sql: 'SELECT * FROM products WHERE store_slug = ? OR (store_slug IS NULL AND ? = ' + "'admin'" + ') ORDER BY id ASC',
+      args: [slug]
+    });
+
     const products = result.rows.map((row) => ({
       id: String(row.id),
       name: String(row.name),
@@ -393,15 +779,16 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// 3. Create Product
+// 3. Create Product (Scoped by store slug)
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, sku, category, price, stock, imageUrl, description } = req.body;
+    const { name, sku, category, price, stock, imageUrl, description, storeSlug, slug } = req.body;
     const id = req.body.id || `PRD-${Date.now()}`;
+    const store_slug = storeSlug || slug || 'admin';
 
     await turso.execute({
-      sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description, store_slug)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id,
         name,
@@ -410,7 +797,8 @@ app.post('/api/products', async (req, res) => {
         Number(price) || 0,
         Number(stock) || 0,
         imageUrl || '',
-        description || ''
+        description || '',
+        store_slug
       ]
     });
 
@@ -503,12 +891,14 @@ app.patch('/api/products/:id/stock', async (req, res) => {
   }
 });
 
-// 7. Get All Transactions
+// 7. Get All Transactions (Scoped by store slug)
 app.get('/api/transactions', async (req, res) => {
   try {
-    const result = await turso.execute(
-      'SELECT * FROM transactions ORDER BY timestamp DESC'
-    );
+    const slug = (req.query.slug as string) || (req.query.store as string) || 'admin';
+    const result = await turso.execute({
+      sql: 'SELECT * FROM transactions WHERE store_slug = ? OR (store_slug IS NULL AND ? = ' + "'admin'" + ') ORDER BY timestamp DESC',
+      args: [slug]
+    });
 
     const transactions = result.rows.map((row) => {
       let items = [];
@@ -543,7 +933,7 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
-// 8. Create Transaction and deduct stock atomically
+// 8. Create Transaction and deduct stock atomically (Scoped by store slug)
 app.post('/api/transactions', async (req, res) => {
   try {
     const {
@@ -559,17 +949,20 @@ app.post('/api/transactions', async (req, res) => {
       change,
       cashierName,
       status,
-      items
+      items,
+      storeSlug,
+      slug
     } = req.body;
 
     const txId = id || `TRX-${Date.now().toString().slice(-6)}`;
     const itemsJson = JSON.stringify(items || []);
+    const store_slug = storeSlug || slug || 'admin';
 
     // Execute atomic batch using Turso transaction
     const batchStatements: any[] = [
       {
-        sql: `INSERT INTO transactions (id, timestamp, date_formatted, subtotal, discount, tax, total, payment_method, amount_paid, change, cashier_name, status, items_json)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO transactions (id, timestamp, date_formatted, subtotal, discount, tax, total, payment_method, amount_paid, change, cashier_name, status, items_json, store_slug)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           txId,
           timestamp,
@@ -583,7 +976,8 @@ app.post('/api/transactions', async (req, res) => {
           Number(change || 0),
           cashierName || 'Andi',
           status || 'Completed',
-          itemsJson
+          itemsJson,
+          store_slug
         ]
       }
     ];

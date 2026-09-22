@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActiveTab, AppTheme } from '../types';
+import { ActiveTab, AppTheme, User } from '../types';
 import { DatabaseStatus } from '../services/api';
 
 interface HeaderProps {
@@ -11,6 +11,8 @@ interface HeaderProps {
   onSearchChange?: (query: string) => void;
   searchPlaceholder?: string;
   dbStatus?: DatabaseStatus | null;
+  currentUser?: User | null;
+  onOpenAuthModal?: (tab?: 'login' | 'register' | 'monitor') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,7 +23,9 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery = '',
   onSearchChange,
   searchPlaceholder = 'Cari...',
-  dbStatus
+  dbStatus,
+  currentUser,
+  onOpenAuthModal
 }) => {
   const isDark = theme === 'glacier-dark';
   const [showNotifications, setShowNotifications] = useState(false);
@@ -55,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
       id="app-header"
       className={`fixed top-0 right-0 left-0 md:left-64 h-16 z-30 flex items-center justify-between px-4 sm:px-6 transition-colors duration-200 border-b ${
         isDark
-          ? 'bg-[#0f1524]/80 backdrop-blur-xl border-sky-400/10 text-slate-100'
+          ? 'bg-[#0d121f] border-slate-800 text-slate-100'
           : 'bg-white border-slate-200 text-slate-800'
       }`}
     >
@@ -65,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
           id="btn-mobile-menu"
           onClick={onOpenMobileMenu}
           className={`p-2 rounded-lg md:hidden ${
-            isDark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-slate-100'
+            isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
           }`}
           aria-label="Buka menu"
         >
@@ -75,8 +79,8 @@ export const Header: React.FC<HeaderProps> = ({
         <div>
           <h2
             id="page-title"
-            className={`text-lg sm:text-xl font-bold tracking-tight ${
-              isDark ? 'text-sky-300 text-glow' : 'text-blue-600'
+            className={`font-display text-lg sm:text-xl font-bold tracking-tight ${
+              isDark ? 'text-white' : 'text-slate-900'
             }`}
           >
             {getTitle()}
@@ -88,10 +92,10 @@ export const Header: React.FC<HeaderProps> = ({
       {onSearchChange && (
         <div className="hidden md:flex items-center flex-1 max-w-xs lg:max-w-md mx-4">
           <div
-            className={`flex items-center w-full px-3.5 py-1.5 rounded-full border transition-all ${
+            className={`flex items-center w-full px-3.5 py-1.5 rounded-lg border transition-all ${
               isDark
-                ? 'bg-slate-900/60 border-sky-400/20 text-slate-200 focus-within:border-sky-400 focus-within:ring-1 focus-within:ring-sky-400/30'
-                : 'bg-slate-100 border-slate-200 text-slate-800 focus-within:bg-white focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20'
+                ? 'bg-slate-900 border-slate-800 text-slate-200 focus-within:border-slate-600'
+                : 'bg-slate-100 border-slate-200 text-slate-800 focus-within:bg-white focus-within:border-blue-500'
             }`}
           >
             <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2">search</span>
@@ -116,46 +120,46 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Right Controls: Turso DB status, Theme Toggle, Notifications, Help */}
-      <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex items-center gap-2">
         {/* Turso Database Badge */}
         <div
           id="turso-status-indicator"
           title={
             dbStatus?.status === 'connected'
-              ? `Terhubung ke Turso LibSQL (${dbStatus.host || 'mycasir3'}) - Latency: ${dbStatus.latency || '<50ms'}`
+              ? `Terhubung ke Turso LibSQL (${dbStatus.host || 'mycasir3'})`
               : dbStatus?.status === 'connecting'
               ? 'Menghubungkan ke Turso Database...'
               : 'Status Turso: Menggunakan sinkronisasi cadangan lokal'
           }
-          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
             dbStatus?.status === 'connected'
               ? isDark
-                ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30'
+                ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
                 : 'bg-emerald-50 text-emerald-700 border-emerald-200'
               : dbStatus?.status === 'connecting'
               ? isDark
-                ? 'bg-sky-950/50 text-sky-300 border-sky-500/30'
+                ? 'bg-blue-950/40 text-blue-300 border-blue-800/60'
                 : 'bg-blue-50 text-blue-700 border-blue-200'
               : isDark
-              ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
+              ? 'bg-amber-950/40 text-amber-300 border-amber-800/60'
               : 'bg-amber-50 text-amber-700 border-amber-200'
           }`}
         >
           <span
             className={`w-2 h-2 rounded-full ${
               dbStatus?.status === 'connected'
-                ? 'bg-emerald-500 animate-pulse'
+                ? 'bg-emerald-500'
                 : dbStatus?.status === 'connecting'
-                ? 'bg-blue-500 animate-ping'
+                ? 'bg-blue-500 animate-pulse'
                 : 'bg-amber-500'
             }`}
           />
-          <span className="font-mono">
+          <span className="font-mono text-[11px]">
             {dbStatus?.status === 'connected'
-              ? `Turso: ${(dbStatus.host?.split('.')[0]) || 'mycasir3'} (${dbStatus.latency || 'live'})`
+              ? `Turso: ${(dbStatus.host?.split('.')[0]) || 'mycasir3'}`
               : dbStatus?.status === 'connecting'
               ? 'Turso: Menghubungkan'
-              : 'Turso: Offline'}
+              : 'Turso: Cadangan'}
           </span>
         </div>
 
@@ -163,10 +167,10 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="btn-theme-toggle"
           onClick={onToggleTheme}
-          title={isDark ? 'Beralih ke Corporate Light Theme' : 'Beralih ke Glacier Glassmorphism Dark Theme'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+          title={isDark ? 'Beralih ke Tema Terang' : 'Beralih ke Tema Gelap'}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
             isDark
-              ? 'bg-sky-950/60 text-sky-300 border-sky-400/30 hover:bg-sky-900/50 shadow-[0_0_15px_rgba(125,211,252,0.15)]'
+              ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
               : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
           }`}
         >
@@ -174,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({
             {isDark ? 'light_mode' : 'dark_mode'}
           </span>
           <span className="hidden sm:inline">
-            {isDark ? 'Glacier Dark' : 'Light Mode'}
+            {isDark ? 'Gelap' : 'Terang'}
           </span>
         </button>
 
@@ -186,34 +190,34 @@ export const Header: React.FC<HeaderProps> = ({
               setShowNotifications(!showNotifications);
               setShowHelp(false);
             }}
-            className={`p-2 rounded-full transition-colors ${
-              isDark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-slate-100'
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
             }`}
             title="Notifikasi"
           >
-            <span className="material-symbols-outlined text-[22px]">notifications</span>
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full" />
           </button>
 
           {showNotifications && (
             <div
               id="notifications-popover"
-              className={`absolute right-0 mt-2 w-72 rounded-xl shadow-xl border p-4 z-50 animate-in fade-in-50 duration-150 ${
+              className={`absolute right-0 mt-2 w-72 rounded-xl shadow-lg border p-4 z-50 animate-in fade-in-50 duration-150 ${
                 isDark
-                  ? 'bg-[#0f1524] border-sky-400/20 text-slate-200 shadow-2xl'
+                  ? 'bg-[#121826] border-slate-800 text-slate-200 shadow-xl'
                   : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-sky-400/10 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">Notifikasi Sistem</span>
-                <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-1.5 py-0.5 rounded-full font-bold">2 Baru</span>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 mb-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Notifikasi Sistem</span>
+                <span className="text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 px-1.5 py-0.5 rounded-full font-bold">2 Baru</span>
               </div>
               <div className="space-y-2.5 text-xs">
-                <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="font-semibold text-red-600 dark:text-red-400">Peringatan Stok Menipis</p>
+                <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                  <p className="font-semibold text-rose-600 dark:text-rose-400">Peringatan Stok Menipis</p>
                   <p className="text-slate-500 dark:text-slate-400 mt-0.5">Pulpen Standard AE7 &amp; Tumbler Stainless habis (0 tersisa).</p>
                 </div>
-                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <p className="font-semibold text-blue-600 dark:text-blue-400">Pembaruan Kasir</p>
                   <p className="text-slate-500 dark:text-slate-400 mt-0.5">Shift kasir Andi aktif sejak 08:00 WIB.</p>
                 </div>
@@ -230,33 +234,66 @@ export const Header: React.FC<HeaderProps> = ({
               setShowHelp(!showHelp);
               setShowNotifications(false);
             }}
-            className={`p-2 rounded-full transition-colors ${
-              isDark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-slate-100'
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
             }`}
             title="Bantuan & Panduan"
           >
-            <span className="material-symbols-outlined text-[22px]">help</span>
+            <span className="material-symbols-outlined text-[20px]">help</span>
           </button>
 
           {showHelp && (
             <div
               id="help-popover"
-              className={`absolute right-0 mt-2 w-80 rounded-xl shadow-xl border p-4 z-50 animate-in fade-in-50 duration-150 ${
+              className={`absolute right-0 mt-2 w-80 rounded-xl shadow-lg border p-4 z-50 animate-in fade-in-50 duration-150 ${
                 isDark
-                  ? 'bg-[#0f1524] border-sky-400/20 text-slate-200'
+                  ? 'bg-[#121826] border-slate-800 text-slate-200 shadow-xl'
                   : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
-              <h4 className="font-bold text-sm mb-2">Pintasan &amp; Panduan Kasirku</h4>
+              <h4 className="font-bold text-sm mb-2 text-slate-800 dark:text-slate-100">Panduan Ringkas Kasirku</h4>
               <ul className="text-xs space-y-1.5 text-slate-600 dark:text-slate-400">
-                <li>• <strong>Kasir:</strong> Klik kartu produk untuk menambahkan ke keranjang.</li>
-                <li>• <strong>Bayar Cepat:</strong> Masukkan jumlah bayar cash atau pilih uang pas.</li>
+                <li>• <strong>Kasir:</strong> Klik kartu produk untuk menambahkan ke keranjang belanja.</li>
+                <li>• <strong>Bayar Cepat:</strong> Masukkan jumlah bayar tunai atau pilih uang pas.</li>
                 <li>• <strong>Stok:</strong> Stok berkurang otomatis setiap kali transaksi dibayar.</li>
                 <li>• <strong>Cetak:</strong> Riwayat transaksi menyediakan cetak struk 80mm &amp; PDF.</li>
               </ul>
             </div>
           )}
         </div>
+
+        {/* User Account Button & Quick Switcher */}
+        {onOpenAuthModal && (
+          <button
+            id="btn-header-user-profile"
+            onClick={() => onOpenAuthModal('login')}
+            className={`flex items-center gap-2 pl-2 pr-3 py-1 rounded-lg border transition-colors ${
+              isDark
+                ? 'bg-[#131926] border-slate-800 hover:border-slate-700 text-slate-200'
+                : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700 shadow-xs'
+            }`}
+            title={currentUser ? `Akun: ${currentUser.name} (${currentUser.storeName})` : 'Masuk atau Buat Akun Toko'}
+          >
+            <div className="w-6 h-6 rounded-md overflow-hidden bg-slate-700 flex items-center justify-center text-white text-[10px] font-bold">
+              {currentUser?.avatar ? (
+                <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-[16px]">account_circle</span>
+              )}
+            </div>
+            <div className="text-left hidden md:block">
+              <p className="text-[11px] font-bold leading-tight truncate max-w-[100px]">
+                {currentUser?.storeName || 'KASIRKU'}
+              </p>
+              <p className="text-[10px] font-mono text-slate-400 leading-none truncate max-w-[100px]">
+                @{currentUser?.username || 'admin'}
+              </p>
+            </div>
+            <span className="material-symbols-outlined text-[16px] text-slate-400">
+              unfold_more
+            </span>
+          </button>
+        )}
       </div>
     </header>
   );

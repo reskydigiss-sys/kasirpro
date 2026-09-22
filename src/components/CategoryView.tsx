@@ -78,10 +78,10 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
           return (
             <div
               key={cat.name}
-              className={`rounded-2xl p-5 border flex flex-col justify-between transition-all hover:shadow-md ${
+              className={`rounded-xl p-5 border flex flex-col justify-between transition-colors ${
                 isDark
-                  ? 'glass-panel text-slate-100 hover:border-sky-400/30'
-                  : 'bg-white border-slate-200'
+                  ? 'bg-[#111827] border-slate-800 text-slate-100 hover:border-slate-700'
+                  : 'bg-white border-slate-200 shadow-xs hover:border-slate-300'
               }`}
             >
               <div>

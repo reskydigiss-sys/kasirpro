@@ -70,49 +70,49 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, theme })
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div
           className={`p-5 rounded-xl border ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
             Total Omset Keseluruhan
           </p>
           <h3
-            className={`text-2xl font-black ${
-              isDark ? 'text-sky-300 text-glow' : 'text-blue-600'
+            className={`text-2xl font-bold font-mono ${
+              isDark ? 'text-white' : 'text-slate-900'
             }`}
           >
             {formatRupiah(totalRevenue)}
           </h3>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 mt-1 font-mono">
             Berdasarkan {transactions.length} transaksi tercatat
           </p>
         </div>
 
         <div
           className={`p-5 rounded-xl border ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
             Rata-rata Nilai Transaksi (AOV)
           </p>
-          <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">
+          <h3 className="text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">
             {formatRupiah(avgTicket)}
           </h3>
-          <p className="text-[11px] text-emerald-500 font-semibold mt-1">
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
             Basket size optimal
           </p>
         </div>
 
         <div
           className={`p-5 rounded-xl border ${
-            isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+            isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
           }`}
         >
           <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
             Metode Pembayaran Terbanyak
           </p>
-          <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">
+          <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             QRIS &amp; Tunai
           </h3>
           <p className="text-[11px] text-slate-400 mt-1">
@@ -124,7 +124,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, theme })
       {/* Methods breakdown */}
       <div
         className={`p-6 rounded-xl border ${
-          isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200 shadow-xs'
+          isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
         }`}
       >
         <h3 className="font-bold text-base mb-4">Porsi Metode Pembayaran</h3>

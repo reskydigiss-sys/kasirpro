@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ActiveTab, AppTheme, Product, CartItem, Transaction, PaymentMethod } from './types';
+import { ActiveTab, AppTheme, Product, CartItem, Transaction, PaymentMethod, User } from './types';
 import { INITIAL_PRODUCTS, INITIAL_TRANSACTIONS, INITIAL_CART } from './data/mockData';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -17,10 +17,71 @@ import { SalesHistoryView } from './components/SalesHistoryView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { PrintableReceipt } from './components/PrintableReceipt';
+import { AuthModal } from './components/AuthModal';
+import { UniquePageBanner } from './components/UniquePageBanner';
 import { formatDate } from './utils/formatters';
 import { api, DatabaseStatus } from './services/api';
 
+const DEFAULT_ADMIN_USER: User = {
+  id: 'usr-admin',
+  username: 'admin',
+  name: 'Admin Kasirku',
+  storeName: 'KASIRKU STORE',
+  slug: 'admin',
+  role: 'Owner',
+  category: 'Retail & Minimarket'
+};
+
+function getInitialUser(): User {
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlSlug = urlParams.get('u') || urlParams.get('user') || urlParams.get('store');
+
+  if (urlSlug) {
+    const clean = urlSlug.toLowerCase().trim();
+    if (clean === 'admin') return DEFAULT_ADMIN_USER;
+    if (clean === 'tokoberkah') {
+      return {
+        id: 'usr-tokoberkah',
+        username: 'tokoberkah',
+        name: 'H. Ahmad',
+        storeName: 'Toko Berkah',
+        slug: 'tokoberkah',
+        role: 'Owner',
+        category: 'Kelontong & Sembako'
+      };
+    }
+    return {
+      id: `usr-${clean}`,
+      username: clean,
+      name: clean.charAt(0).toUpperCase() + clean.slice(1),
+      storeName: `Toko ${clean.charAt(0).toUpperCase() + clean.slice(1)}`,
+      slug: clean,
+      role: 'Owner',
+      category: 'Retail'
+    };
+  }
+
+  const saved = localStorage.getItem('kasirku_user');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to parse cached user:', e);
+    }
+  }
+
+  return DEFAULT_ADMIN_USER;
+}
+
 export default function App() {
+  // Current logged in user & unique store page
+  const [currentUser, setCurrentUser] = useState<User>(getInitialUser);
+  const currentSlug = currentUser?.slug || 'admin';
+
+  // Auth & Monitor Modal state
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'monitor'>('login');
+
   // Theme state
   const [theme, setTheme] = useState<AppTheme>(() => {
     const saved = localStorage.getItem('kasirku_theme');
@@ -43,9 +104,9 @@ export default function App() {
     host: 'mycasir3-reskydigiss-sys.aws-ap-northeast-1.turso.io'
   });
 
-  // Products state (persisted in Turso and cached locally)
+  // Products state (scoped per store slug)
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('kasirku_products');
+    const saved = localStorage.getItem(`kasirku_products_${currentSlug}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -53,12 +114,12 @@ export default function App() {
         console.error('Failed to parse cached products', e);
       }
     }
-    return INITIAL_PRODUCTS;
+    return currentSlug === 'admin' ? INITIAL_PRODUCTS : [];
   });
 
   // Shopping Cart state
   const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('kasirku_cart');
+    const saved = localStorage.getItem(`kasirku_cart_${currentSlug}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -66,12 +127,12 @@ export default function App() {
         console.error('Failed to parse cached cart', e);
       }
     }
-    return INITIAL_CART;
+    return currentSlug === 'admin' ? INITIAL_CART : [];
   });
 
-  // Transactions state
+  // Transactions state (scoped per store slug)
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('kasirku_transactions');
+    const saved = localStorage.getItem(`kasirku_transactions_${currentSlug}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -79,47 +140,66 @@ export default function App() {
         console.error('Failed to parse cached transactions', e);
       }
     }
-    return INITIAL_TRANSACTIONS;
+    return currentSlug === 'admin' ? INITIAL_TRANSACTIONS : [];
   });
 
   // Printable transaction
   const [printableTx, setPrintableTx] = useState<Transaction | null>(null);
 
-  // Sync with Turso cloud database
-  const refreshDatabase = useCallback(async () => {
+  // Sync with Turso cloud database for the current store slug
+  const refreshDatabase = useCallback(async (slugToFetch: string = currentSlug) => {
     try {
       const status = await api.getStatus();
       setDbStatus(status);
 
       if (status.status === 'connected') {
-        const remoteProducts = await api.getProducts();
-        if (remoteProducts && Array.isArray(remoteProducts) && remoteProducts.length > 0) {
+        const remoteProducts = await api.getProducts(slugToFetch);
+        if (remoteProducts && Array.isArray(remoteProducts)) {
           setProducts(remoteProducts);
-          localStorage.setItem('kasirku_products', JSON.stringify(remoteProducts));
+          localStorage.setItem(`kasirku_products_${slugToFetch}`, JSON.stringify(remoteProducts));
         }
 
-        const remoteTransactions = await api.getTransactions();
-        if (remoteTransactions && Array.isArray(remoteTransactions) && remoteTransactions.length > 0) {
+        const remoteTransactions = await api.getTransactions(slugToFetch);
+        if (remoteTransactions && Array.isArray(remoteTransactions)) {
           setTransactions(remoteTransactions);
-          localStorage.setItem('kasirku_transactions', JSON.stringify(remoteTransactions));
+          localStorage.setItem(`kasirku_transactions_${slugToFetch}`, JSON.stringify(remoteTransactions));
         }
+
+        // Also fetch official user details if available
+        api.getUserBySlug(slugToFetch).then((data) => {
+          if (data && data.user) {
+            setCurrentUser(data.user);
+            localStorage.setItem('kasirku_user', JSON.stringify(data.user));
+          }
+        }).catch(() => {});
       }
     } catch (error) {
       console.warn('Using local cached storage while Turso server starts:', error);
       setDbStatus((prev) => prev ? { ...prev, status: 'connecting' } : null);
     }
-  }, []);
+  }, [currentSlug]);
 
+  // When current user changes or on first mount
   useEffect(() => {
-    refreshDatabase();
-    // Periodically ping status every 30 seconds
+    refreshDatabase(currentSlug);
+    // Sync browser URL to ?u=slug
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('u') !== currentSlug) {
+      url.searchParams.set('u', currentSlug);
+      window.history.replaceState({}, '', url.toString());
+    }
+    localStorage.setItem('kasirku_user', JSON.stringify(currentUser));
+  }, [currentSlug, currentUser, refreshDatabase]);
+
+  // Periodic status ping
+  useEffect(() => {
     const interval = setInterval(() => {
       api.getStatus().then((s) => setDbStatus(s)).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
-  }, [refreshDatabase]);
+  }, []);
 
-  // Sync to localStorage
+  // Theme synchronization
   useEffect(() => {
     localStorage.setItem('kasirku_theme', theme);
     if (theme === 'glacier-dark') {
@@ -129,17 +209,18 @@ export default function App() {
     }
   }, [theme]);
 
+  // Cache products, cart, transactions per slug
   useEffect(() => {
-    localStorage.setItem('kasirku_products', JSON.stringify(products));
-  }, [products]);
+    localStorage.setItem(`kasirku_products_${currentSlug}`, JSON.stringify(products));
+  }, [products, currentSlug]);
 
   useEffect(() => {
-    localStorage.setItem('kasirku_cart', JSON.stringify(cart));
-  }, [cart]);
+    localStorage.setItem(`kasirku_cart_${currentSlug}`, JSON.stringify(cart));
+  }, [cart, currentSlug]);
 
   useEffect(() => {
-    localStorage.setItem('kasirku_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem(`kasirku_transactions_${currentSlug}`, JSON.stringify(transactions));
+  }, [transactions, currentSlug]);
 
   // Low stock counter
   const lowStockCount = products.filter((p) => p.stock <= 5).length;
@@ -147,6 +228,25 @@ export default function App() {
   // Toggle theme
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'glacier-dark' ? 'corporate-light' : 'glacier-dark'));
+  };
+
+  // Switch / Login user
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUser(user);
+    setCart([]);
+    refreshDatabase(user.slug);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('kasirku_user');
+    setCurrentUser(DEFAULT_ADMIN_USER);
+    setCart([]);
+    refreshDatabase('admin');
+  };
+
+  const openAuthModalWithTab = (tab: 'login' | 'register' | 'monitor' = 'login') => {
+    setAuthModalTab(tab);
+    setAuthModalOpen(true);
   };
 
   // Cart operations
@@ -238,8 +338,8 @@ export default function App() {
     setTransactions((prev) => [newTx, ...prev]);
     setPrintableTx(newTx);
 
-    // Persist to Turso database asynchronously
-    api.createTransaction(newTx)
+    // Persist to Turso database asynchronously (scoped by current store slug)
+    api.createTransaction(newTx, currentSlug)
       .then(() => {
         // Refresh db status to update transaction count
         api.getStatus().then((s) => setDbStatus(s)).catch(() => {});
@@ -251,7 +351,7 @@ export default function App() {
     return newTx;
   };
 
-  // Product CRUD with Turso Cloud Sync
+  // Product CRUD with Turso Cloud Sync (scoped by current store slug)
   const handleAddProduct = (newProductData: Omit<Product, 'id'>) => {
     const newId = `PRD-${Date.now()}`;
     const newProduct: Product = {
@@ -260,7 +360,7 @@ export default function App() {
     };
     setProducts((prev) => [newProduct, ...prev]);
 
-    api.createProduct(newProduct)
+    api.createProduct(newProduct, currentSlug)
       .then(() => api.getStatus().then((s) => setDbStatus(s)))
       .catch((err) => console.warn('Turso add product warning:', err));
   };
@@ -298,16 +398,16 @@ export default function App() {
 
   // Reset to initial demo data
   const handleResetData = async () => {
-    localStorage.removeItem('kasirku_products');
-    localStorage.removeItem('kasirku_cart');
-    localStorage.removeItem('kasirku_transactions');
+    localStorage.removeItem(`kasirku_products_${currentSlug}`);
+    localStorage.removeItem(`kasirku_cart_${currentSlug}`);
+    localStorage.removeItem(`kasirku_transactions_${currentSlug}`);
     setProducts(INITIAL_PRODUCTS);
     setCart(INITIAL_CART);
     setTransactions(INITIAL_TRANSACTIONS);
 
     try {
       await api.resetDatabase();
-      await refreshDatabase();
+      await refreshDatabase(currentSlug);
     } catch (e) {
       console.warn('Reset local only:', e);
     }
@@ -333,6 +433,8 @@ export default function App() {
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
         lowStockCount={lowStockCount}
+        currentUser={currentUser}
+        onOpenAuthModal={openAuthModalWithTab}
       />
 
       {/* Main Container Area */}
@@ -345,6 +447,8 @@ export default function App() {
           onOpenMobileMenu={() => setMobileOpen(true)}
           searchQuery={headerSearch}
           dbStatus={dbStatus}
+          currentUser={currentUser}
+          onOpenAuthModal={openAuthModalWithTab}
           onSearchChange={
             ['kasir', 'produk', 'stok', 'riwayat'].includes(activeTab)
               ? setHeaderSearch
@@ -360,7 +464,15 @@ export default function App() {
         />
 
         {/* Tab Content Canvas */}
-        <main id="main-content-canvas" className="flex-1 pt-16 min-h-0 overflow-y-auto">
+        <main id="main-content-canvas" className="flex-1 pt-18 min-h-0 overflow-y-auto">
+          {/* Top Banner indicating unique store page */}
+          <UniquePageBanner
+            currentUser={currentUser}
+            currentSlug={currentSlug}
+            theme={theme}
+            onOpenAuthModal={openAuthModalWithTab}
+          />
+
           {activeTab === 'dashboard' && (
             <DashboardView
               transactions={transactions}
@@ -426,11 +538,24 @@ export default function App() {
               onThemeChange={setTheme}
               onResetData={handleResetData}
               dbStatus={dbStatus}
-              onRefreshDbStatus={refreshDatabase}
+              onRefreshDbStatus={() => refreshDatabase(currentSlug)}
+              currentUser={currentUser}
+              onOpenAuthModal={openAuthModalWithTab}
             />
           )}
         </main>
       </div>
+
+      {/* Auth, Credentials & Unique Store Pages Monitor Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        currentUser={currentUser}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
+        theme={theme}
+        initialTab={authModalTab}
+      />
 
       {/* Hidden print receipt rendered for standard browser print (Cetak Struk) */}
       <PrintableReceipt transaction={printableTx || transactions[0] || null} />

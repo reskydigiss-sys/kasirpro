@@ -76,15 +76,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
       {/* Stock Table */}
       <div
-        className={`rounded-xl border overflow-hidden shadow-xs ${
-          isDark ? 'glass-panel text-slate-100' : 'bg-white border-slate-200'
+        className={`rounded-xl border overflow-hidden ${
+          isDark ? 'bg-[#111827] border-slate-800 text-slate-100' : 'bg-white border-slate-200 shadow-xs'
         }`}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
             <thead
               className={`border-b text-xs font-semibold ${
-                isDark ? 'bg-slate-900/60 border-sky-400/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
+                isDark ? 'bg-[#0e1422] border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
               }`}
             >
               <tr>
