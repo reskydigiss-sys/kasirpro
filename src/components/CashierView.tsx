@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, CartItem, CategoryType, AppTheme, PaymentMethod, Transaction } from '../types';
 import { formatRupiah, parseRupiahInput } from '../utils/formatters';
+import { playScannerBeep } from '../utils/scannerSound';
 
 interface CashierViewProps {
   products: Product[];
@@ -35,6 +36,8 @@ export const CashierView: React.FC<CashierViewProps> = ({
   searchQuery = ''
 }) => {
   const isDark = theme === 'glacier-dark';
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [localSearch, setLocalSearch] = useState('');
   const [discountAmount, setDiscountAmount] = useState<number>(0);
@@ -42,6 +45,52 @@ export const CashierView: React.FC<CashierViewProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tunai');
   const [checkoutSuccessTx, setCheckoutSuccessTx] = useState<Transaction | null>(null);
   const [paymentError, setPaymentError] = useState<string>('');
+
+  // Barcode Scanner States
+  const [isBeepEnabled, setIsBeepEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('kasirku_scanner_beep') !== 'false';
+  });
+  const [autoScanOnExactMatch, setAutoScanOnExactMatch] = useState<boolean>(() => {
+    return localStorage.getItem('kasirku_auto_scan_match') !== 'false';
+  });
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [modalCustomSku, setModalCustomSku] = useState('');
+  const [lastScannedFeedback, setLastScannedFeedback] = useState<{
+    text: string;
+    type: 'success' | 'error' | 'info';
+    timestamp: number;
+    product?: Product;
+  } | null>(null);
+
+  const [recentScans, setRecentScans] = useState<
+    Array<{ sku: string; name: string; time: string; success: boolean }>
+  >([]);
+
+  // Automatically dismiss barcode feedback after 4 seconds
+  useEffect(() => {
+    if (!lastScannedFeedback) return;
+    const timer = setTimeout(() => {
+      setLastScannedFeedback(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [lastScannedFeedback]);
+
+  const toggleBeep = () => {
+    setIsBeepEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem('kasirku_scanner_beep', String(next));
+      if (next) playScannerBeep('success', false);
+      return next;
+    });
+  };
+
+  const toggleAutoScan = () => {
+    setAutoScanOnExactMatch((prev) => {
+      const next = !prev;
+      localStorage.setItem('kasirku_auto_scan_match', String(next));
+      return next;
+    });
+  };
 
   const categories: string[] = ['Semua', 'Alat Tulis', 'Makanan', 'Minuman', 'Lainnya'];
 
@@ -59,6 +108,98 @@ export const CashierView: React.FC<CashierViewProps> = ({
       return matchCat && matchSearch;
     });
   }, [products, selectedCategory, query]);
+
+  /**
+   * Interprets EAN/SKU barcode input and automatically adds matching product to cart
+   */
+  const handleBarcodeScan = (rawString: string): boolean => {
+    const trimmed = rawString.trim();
+    if (!trimmed) return false;
+
+    const clean = trimmed.toLowerCase();
+    const cleanNoHyphen = clean.replace(/[-\s]/g, '');
+
+    // 1. Exact match on sku (e.g. ATK-001 or 8992753...)
+    let matched = products.find((p) => p.sku.toLowerCase() === clean);
+
+    // 2. Match on stripped sku / EAN (e.g. ATK001 vs ATK-001)
+    if (!matched) {
+      matched = products.find(
+        (p) => p.sku.toLowerCase().replace(/[-\s]/g, '') === cleanNoHyphen
+      );
+    }
+
+    // 3. Match on product ID (e.g. prod-1)
+    if (!matched) {
+      matched = products.find((p) => p.id.toLowerCase() === clean);
+    }
+
+    // 4. Exact match on product name
+    if (!matched) {
+      matched = products.find((p) => p.name.toLowerCase() === clean);
+    }
+
+    // 5. Fallback: if single item in filtered list
+    if (!matched && filteredProducts.length === 1) {
+      matched = filteredProducts[0];
+    }
+
+    if (matched) {
+      if (matched.stock <= 0) {
+        playScannerBeep('error', !isBeepEnabled);
+        setLastScannedFeedback({
+          text: `⚠️ [HABIS] Stok "${matched.name}" (${matched.sku}) habis!`,
+          type: 'error',
+          timestamp: Date.now(),
+          product: matched
+        });
+        setRecentScans((prev) => [
+          {
+            sku: matched!.sku,
+            name: matched!.name,
+            time: new Date().toLocaleTimeString('id-ID'),
+            success: false
+          },
+          ...prev.slice(0, 7)
+        ]);
+        return false;
+      }
+
+      // Add to cart
+      onAddToCart(matched);
+      playScannerBeep('success', !isBeepEnabled);
+      setLocalSearch('');
+      setLastScannedFeedback({
+        text: `✅ [BEEP] Barcode "${matched.sku}" terdeteksi: "${matched.name}" ditambahkan ke keranjang (+1)`,
+        type: 'success',
+        timestamp: Date.now(),
+        product: matched
+      });
+      setRecentScans((prev) => [
+        {
+          sku: matched!.sku,
+          name: matched!.name,
+          time: new Date().toLocaleTimeString('id-ID'),
+          success: true
+        },
+        ...prev.slice(0, 7)
+      ]);
+
+      // Refocus search input for rapid consecutive barcode scanning
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 40);
+      return true;
+    } else {
+      playScannerBeep('error', !isBeepEnabled);
+      setLastScannedFeedback({
+        text: `❌ Barcode / SKU "${trimmed}" tidak cocok dengan produk manapun!`,
+        type: 'error',
+        timestamp: Date.now()
+      });
+      return false;
+    }
+  };
 
   // Calculations
   const subtotal = useMemo(() => {
@@ -123,34 +264,138 @@ export const CashierView: React.FC<CashierViewProps> = ({
             : 'bg-slate-50 border-slate-200'
         }`}
       >
-        {/* Category Pills & Search */}
+        {/* Category Pills, Barcode Search & Scanner Simulator Bar */}
         <div
           id="cashier-filter-bar"
-          className={`p-4 border-b flex flex-wrap items-center gap-3 shrink-0 ${
+          className={`p-4 border-b flex flex-wrap items-center gap-2.5 shrink-0 ${
             isDark ? 'bg-[#111827] border-slate-800' : 'bg-white border-slate-200'
           }`}
         >
-          {/* Quick local search on mobile or top */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
-              search
+          {/* Barcode / SKU Interpreter Search Box */}
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-blue-500 dark:text-blue-400 text-[18px]">
+              barcode_scanner
             </span>
             <input
+              ref={searchInputRef}
               id="input-cashier-search"
               type="text"
               value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              placeholder="Cari produk atau SKU..."
-              className={`w-full pl-9 pr-4 py-1.5 rounded-lg text-xs outline-none border transition-colors ${
+              onChange={(e) => {
+                const val = e.target.value;
+                setLocalSearch(val);
+                // Instant Auto-scan if exact SKU match detected
+                if (autoScanOnExactMatch && val.trim().length >= 3) {
+                  const exact = products.find(
+                    (p) => p.sku.toLowerCase() === val.trim().toLowerCase()
+                  );
+                  if (exact) {
+                    handleBarcodeScan(val);
+                  }
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleBarcodeScan(localSearch);
+                }
+              }}
+              placeholder="Scan barcode / ketik SKU lalu Enter..."
+              className={`w-full pl-9 pr-16 py-2 rounded-lg text-xs outline-none border transition-all ${
                 isDark
-                  ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-500'
-                  : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500'
+                  ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30'
+                  : 'bg-slate-50 border-slate-300 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20'
               }`}
             />
+
+            {localSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalSearch('');
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute right-12 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                title="Hapus teks"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => handleBarcodeScan(localSearch)}
+              disabled={!localSearch.trim()}
+              className={`absolute right-1.5 top-1.5 px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                localSearch.trim()
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs active:scale-95'
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+              }`}
+              title="Kirim Scan Barcode / Tambah ke Keranjang"
+            >
+              Scan
+            </button>
           </div>
 
+          {/* Scanner Simulator Action Button */}
+          <button
+            id="btn-open-scanner-modal"
+            type="button"
+            onClick={() => setIsScannerModalOpen(true)}
+            className={`px-3 py-2 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
+              isDark
+                ? 'bg-blue-950/50 border-blue-800/80 text-blue-400 hover:bg-blue-900/60'
+                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+            }`}
+            title="Buka Panel Simulasi Barcode Scanner Laser"
+          >
+            <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+            <span className="hidden sm:inline">Simulasi Scanner</span>
+          </button>
+
+          {/* Beep Audio Toggle */}
+          <button
+            id="btn-toggle-scanner-beep"
+            type="button"
+            onClick={toggleBeep}
+            className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+              isBeepEnabled
+                ? isDark
+                  ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : isDark
+                ? 'bg-slate-800 border-slate-700 text-slate-500'
+                : 'bg-slate-100 border-slate-300 text-slate-400'
+            }`}
+            title={isBeepEnabled ? 'Suara Beeper Kasir: AKTIF' : 'Suara Beeper Kasir: SENYAP'}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {isBeepEnabled ? 'volume_up' : 'volume_off'}
+            </span>
+          </button>
+
+          {/* Auto-Scan on Exact Match Toggle */}
+          <button
+            id="btn-toggle-auto-scan"
+            type="button"
+            onClick={toggleAutoScan}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer hidden md:flex items-center gap-1 ${
+              autoScanOnExactMatch
+                ? isDark
+                  ? 'bg-amber-950/40 border-amber-800/50 text-amber-400'
+                  : 'bg-amber-50 border-amber-200 text-amber-700'
+                : isDark
+                ? 'bg-slate-800 border-slate-700 text-slate-500'
+                : 'bg-slate-100 border-slate-300 text-slate-400'
+            }`}
+            title="Deteksi otomatis saat barcode/SKU cocok persis tanpa harus klik tombol"
+          >
+            <span className="material-symbols-outlined text-[15px]">bolt</span>
+            <span>Auto-Scan: {autoScanOnExactMatch ? 'ON' : 'OFF'}</span>
+          </button>
+
           {/* Category Filter Pills */}
-          <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar w-full sm:w-auto">
             {categories.map((cat) => {
               const isSelected = selectedCategory === cat;
               return (
@@ -158,7 +403,7 @@ export const CashierView: React.FC<CashierViewProps> = ({
                   key={cat}
                   id={`filter-pill-${cat.toLowerCase().replace(/\s+/g, '-')}`}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-blue-600 text-white shadow-xs'
                       : isDark
@@ -172,6 +417,36 @@ export const CashierView: React.FC<CashierViewProps> = ({
             })}
           </div>
         </div>
+
+        {/* Live Barcode Scan Feedback Toast */}
+        {lastScannedFeedback && (
+          <div
+            id="barcode-scan-feedback-banner"
+            className={`mx-4 mt-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-3 shadow-md animate-in fade-in slide-in-from-top-2 duration-150 ${
+              lastScannedFeedback.type === 'success'
+                ? isDark
+                  ? 'bg-emerald-950/80 border-emerald-800/90 text-emerald-300'
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                : isDark
+                ? 'bg-rose-950/80 border-rose-800/90 text-rose-300'
+                : 'bg-rose-50 border-rose-300 text-rose-800'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-[20px] shrink-0">
+                {lastScannedFeedback.type === 'success' ? 'barcode_scanner' : 'warning'}
+              </span>
+              <span className="truncate">{lastScannedFeedback.text}</span>
+            </div>
+            <button
+              onClick={() => setLastScannedFeedback(null)}
+              className="p-0.5 hover:opacity-75 cursor-pointer shrink-0"
+              title="Tutup notifikasi"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          </div>
+        )}
 
         {/* Product Grid Area */}
         <div
@@ -240,8 +515,22 @@ export const CashierView: React.FC<CashierViewProps> = ({
 
                 {/* Product Details */}
                 <div className="p-3.5 flex flex-col flex-1">
-                  <div className="text-[11px] font-semibold text-slate-400 mb-0.5">
-                    SKU: {prod.sku}
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-1">
+                    <span className="flex items-center gap-1 font-mono">
+                      <span className="material-symbols-outlined text-[14px] text-blue-500">barcode</span>
+                      {prod.sku}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBarcodeScan(prod.sku);
+                      }}
+                      className="opacity-80 group-hover:opacity-100 hover:text-blue-500 px-1.5 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold border border-blue-500/20 transition-all cursor-pointer"
+                      title="Klik untuk simulasi scan barcode SKU ini"
+                    >
+                      Scan
+                    </button>
                   </div>
                   <h3
                     className={`text-xs sm:text-sm font-bold line-clamp-2 leading-tight mb-2 ${
@@ -608,6 +897,242 @@ export const CashierView: React.FC<CashierViewProps> = ({
           </button>
         </div>
       </section>
+
+      {/* Barcode Scanner Simulation & Hardware Test Modal */}
+      {isScannerModalOpen && (
+        <div
+          id="modal-barcode-simulator"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in-50 duration-150"
+        >
+          <div
+            className={`w-full max-w-xl rounded-2xl shadow-2xl border p-5 sm:p-6 overflow-hidden flex flex-col max-h-[90vh] ${
+              isDark
+                ? 'bg-[#0f172a] border-slate-700 text-slate-100 shadow-blue-950/40'
+                : 'bg-white border-slate-200 text-slate-800 shadow-slate-300'
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
+                  <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base leading-tight">
+                    Simulasi Barcode Scanner (POS)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Menerjemahkan kode EAN/SKU &amp; auto-add ke keranjang kasir
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsScannerModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 custom-scrollbar">
+              {/* Laser Scanner Visual Animation Box */}
+              <div
+                className={`relative rounded-xl p-4 border overflow-hidden flex flex-col items-center justify-center text-center ${
+                  isDark ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-900 text-white border-slate-800'
+                }`}
+              >
+                {/* Red Laser Sweeping Line */}
+                <div className="absolute inset-x-0 h-0.5 bg-red-500 shadow-[0_0_12px_#ef4444] animate-pulse pointer-events-none top-1/2 transform -translate-y-1/2" />
+
+                {/* Simulated EAN-13 Barcode Graphic */}
+                <div className="flex items-end gap-1 h-14 px-6 py-2 bg-white rounded-md mb-2 shadow-inner">
+                  {[2, 1, 3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 2, 1, 3, 4, 1, 2, 1, 3, 2].map(
+                    (w, idx) => (
+                      <div
+                        key={idx}
+                        style={{ width: `${w * 2}px` }}
+                        className="h-full bg-slate-950"
+                      />
+                    )
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="font-bold text-emerald-400">SCANNER HARDWARE READY</span>
+                  <span>•</span>
+                  <span>Audio Beep: {isBeepEnabled ? 'AKTIF (1850Hz)' : 'SENYAP'}</span>
+                </div>
+              </div>
+
+              {/* Manual Input Barcode Field */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Input String Barcode / SKU / EAN-13:
+                </label>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (modalCustomSku.trim()) {
+                      handleBarcodeScan(modalCustomSku);
+                      setModalCustomSku('');
+                    }
+                  }}
+                  className="flex gap-2"
+                >
+                  <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
+                      barcode
+                    </span>
+                    <input
+                      type="text"
+                      value={modalCustomSku}
+                      onChange={(e) => setModalCustomSku(e.target.value)}
+                      placeholder="Contoh: ATK-001, MK-005, MN-004..."
+                      className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs font-mono outline-none border transition-all ${
+                        isDark
+                          ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30'
+                          : 'bg-white border-slate-300 text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20'
+                      }`}
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!modalCustomSku.trim()}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      modalCustomSku.trim()
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs active:scale-95'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">sensors</span>
+                    <span>Simulate Scan</span>
+                  </button>
+                </form>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  💡 Scanner fisik (USB/Bluetooth) mengirimkan string SKU/barcode lalu menekan tombol <strong>Enter</strong> secara otomatis.
+                </p>
+              </div>
+
+              {/* Quick Scan Test Buttons for Current Store Products */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Uji Scan Cepat (Katalog Produk Toko):
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Klik produk di bawah untuk simulasi scan instan
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                  {products.map((p) => {
+                    const isOut = p.stock <= 0;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleBarcodeScan(p.sku)}
+                        className={`p-2.5 rounded-xl border text-left flex items-center justify-between gap-2 transition-all cursor-pointer select-none group ${
+                          isOut
+                            ? 'opacity-60 bg-slate-100 dark:bg-slate-900 border-dashed border-slate-300 dark:border-slate-800'
+                            : isDark
+                            ? 'bg-slate-900/90 border-slate-800 hover:border-blue-500 hover:bg-slate-800/80 active:scale-[0.98]'
+                            : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 active:scale-[0.98]'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[11px] font-bold px-1.5 py-0.2 rounded bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              {p.sku}
+                            </span>
+                            <span className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                              {p.name}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                            {formatRupiah(p.price)} • Stok: {p.stock}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          <span className="material-symbols-outlined text-[18px] text-blue-500 group-hover:scale-110 transition-transform">
+                            barcode_scanner
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Recent Scan History Log */}
+              {recentScans.length > 0 && (
+                <div
+                  className={`p-3 rounded-xl border text-xs ${
+                    isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <p className="font-bold text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">history</span>
+                    <span>Log Pemindaian Barcode Terakhir:</span>
+                  </p>
+                  <div className="space-y-1">
+                    {recentScans.map((scan, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between font-mono text-[11px] py-0.5 border-b border-dashed border-slate-200 dark:border-slate-800/80 last:border-0"
+                      >
+                        <span className="flex items-center gap-1.5 truncate">
+                          <span className={scan.success ? 'text-emerald-500' : 'text-rose-500'}>
+                            {scan.success ? '✓' : '✗'}
+                          </span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            [{scan.sku}]
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400 truncate">
+                            {scan.name}
+                          </span>
+                        </span>
+                        <span className="text-slate-400 shrink-0">{scan.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleBeep}
+                  className={`px-2.5 py-1 rounded-lg border font-bold flex items-center gap-1 cursor-pointer ${
+                    isBeepEnabled
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 border-slate-300 dark:border-slate-700'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {isBeepEnabled ? 'volume_up' : 'volume_off'}
+                  </span>
+                  <span>Beep {isBeepEnabled ? 'ON' : 'OFF'}</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsScannerModalOpen(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl cursor-pointer shadow-xs"
+              >
+                Selesai / Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Success Receipt Modal */}
       {checkoutSuccessTx && (

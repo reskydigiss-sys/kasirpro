@@ -24,16 +24,16 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   const usernameInputId = useId();
   const passwordInputId = useId();
 
-  // Admin Authentication State
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    return (
-      currentUser.role === 'Super Admin' ||
-      localStorage.getItem('kasirku_admin_session') === 'true'
-    );
-  });
+  // Admin Authentication State: Selalu wajib login manual (auto login dihilangkan)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
-  // Login Form State
-  const [username, setUsername] = useState('admin');
+  // Bersihkan sisa sesi login admin saat komponen dimuat agar selalu meminta login
+  useEffect(() => {
+    localStorage.removeItem('kasirku_admin_session');
+  }, []);
+
+  // Login Form State: Kosong secara default agar user memasukkan kredensial manual
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -105,7 +105,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
         password: password
       });
 
-      localStorage.setItem('kasirku_admin_session', 'true');
+      // Sesi hanya aktif di memori selama berada di portal admin (tidak disimpan permanen di localStorage)
       setIsAdminAuthenticated(true);
       onAdminLoginSuccess(res.user);
     } catch (err: any) {
@@ -124,6 +124,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   const handleLogoutAdmin = () => {
     localStorage.removeItem('kasirku_admin_session');
     setIsAdminAuthenticated(false);
+    setUsername('');
     setPassword('');
     onAdminLogout();
   };
