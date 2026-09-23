@@ -17,6 +17,47 @@ export interface UserStoreStats {
   totalRevenue: number;
 }
 
+export interface StoreSummaryItem {
+  id: string;
+  username: string;
+  name: string;
+  storeName: string;
+  slug: string;
+  role: string;
+  category: string;
+  avatar?: string;
+  createdAt?: string;
+  productsCount: number;
+  transactionsCount: number;
+  totalRevenue: number;
+}
+
+export interface AdminGlobalStats {
+  totalStores: number;
+  totalProducts: number;
+  totalTransactions: number;
+  totalRevenue: number;
+}
+
+export interface AdminLatestTx {
+  id: string;
+  timestamp: string;
+  dateFormatted: string;
+  total: number;
+  paymentMethod: string;
+  cashierName: string;
+  storeSlug: string;
+  storeName: string;
+  customerName?: string;
+}
+
+export interface AdminOverviewData {
+  globalStats: AdminGlobalStats;
+  stores: StoreSummaryItem[];
+  latestTransactions: AdminLatestTx[];
+  dbStatus: DatabaseStatus;
+}
+
 export const api = {
   async getStatus(): Promise<DatabaseStatus> {
     try {
@@ -154,6 +195,34 @@ export const api = {
   async resetDatabase(): Promise<void> {
     const res = await fetch('/api/reset', { method: 'POST' });
     if (!res.ok) throw new Error('Gagal mereset database Turso');
+  },
+
+  // Super Admin Methods
+  async adminLogin(credentials: { username: string; password: string }): Promise<{
+    success: boolean;
+    user: User;
+    adminToken: string;
+    serverTime: string;
+  }> {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Gagal masuk sebagai Administrator Aplikasi');
+    }
+    return await res.json();
+  },
+
+  async getAdminOverview(): Promise<AdminOverviewData> {
+    const res = await fetch('/api/admin/overview');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Gagal memuat data monitoring toko');
+    }
+    return await res.json();
   }
 };
 

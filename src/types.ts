@@ -45,6 +45,7 @@ export interface Transaction {
 }
 
 export type ActiveTab = 
+  | 'landing'
   | 'dashboard'
   | 'kasir'
   | 'produk'
@@ -52,7 +53,8 @@ export type ActiveTab =
   | 'stok'
   | 'riwayat'
   | 'laporan'
-  | 'pengaturan';
+  | 'pengaturan'
+  | 'admin';
 
 export type AppTheme = 'corporate-light' | 'glacier-dark';
 

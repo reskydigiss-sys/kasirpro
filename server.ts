@@ -753,14 +753,181 @@ app.get('/api/users/:slug', async (req, res) => {
   }
 });
 
+// Dedicated Application Admin Login
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username dan password Admin wajib diisi' });
+    }
+
+    const cleanUsername = String(username).toLowerCase().trim();
+
+    // Verify admin credentials
+    const result = await turso.execute({
+      sql: 'SELECT * FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1',
+      args: [cleanUsername]
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Akun administrator tidak ditemukan' });
+    }
+
+    const row = result.rows[0];
+    if (String(row.password) !== String(password)) {
+      return res.status(401).json({ error: 'Password administrator salah' });
+    }
+
+    // Must be admin or have Super Admin/Owner role
+    const isAppAdmin = cleanUsername === 'admin' || String(row.role).toLowerCase().includes('admin') || String(row.role) === 'Owner';
+    if (!isAppAdmin) {
+      return res.status(403).json({ error: 'Akses ditolak: Akun ini bukan Administrator Aplikasi' });
+    }
+
+    const adminUser = {
+      id: String(row.id),
+      username: String(row.username),
+      name: String(row.name),
+      storeName: String(row.store_name),
+      slug: String(row.slug),
+      role: 'Super Admin',
+      category: row.category ? String(row.category) : 'Sistem Pusat',
+      avatar: row.avatar ? String(row.avatar) : undefined
+    };
+
+    res.json({
+      success: true,
+      user: adminUser,
+      adminToken: `admin_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Error in admin login:', error);
+    res.status(500).json({ error: error.message || 'Gagal autentikasi admin' });
+  }
+});
+
+// Super Admin Overview: Monitor all stores, aggregate metrics & live global feed
+app.get('/api/admin/overview', async (req, res) => {
+  try {
+    const start = Date.now();
+    // 1. Get all stores
+    const usersRes = await turso.execute(
+      'SELECT id, username, name, store_name, slug, role, category, avatar, created_at FROM users ORDER BY created_at ASC'
+    );
+
+    // 2. Compute individual stats for each store
+    const storesWithStats = await Promise.all(
+      usersRes.rows.map(async (row) => {
+        const slug = String(row.slug);
+        const [prodRes, txRes] = await Promise.all([
+          turso.execute({
+            sql: slug === 'admin'
+              ? 'SELECT COUNT(*) as count FROM products WHERE store_slug = ? OR store_slug IS NULL'
+              : 'SELECT COUNT(*) as count FROM products WHERE store_slug = ?',
+            args: [slug]
+          }),
+          turso.execute({
+            sql: slug === 'admin'
+              ? 'SELECT COUNT(*) as count, SUM(total) as revenue FROM transactions WHERE store_slug = ? OR store_slug IS NULL'
+              : 'SELECT COUNT(*) as count, SUM(total) as revenue FROM transactions WHERE store_slug = ?',
+            args: [slug]
+          })
+        ]);
+
+        return {
+          id: String(row.id),
+          username: String(row.username),
+          name: String(row.name),
+          storeName: String(row.store_name),
+          slug: slug,
+          role: String(row.role || 'Owner'),
+          category: row.category ? String(row.category) : 'Retail',
+          avatar: row.avatar ? String(row.avatar) : undefined,
+          createdAt: row.created_at ? String(row.created_at) : undefined,
+          productsCount: Number(prodRes.rows[0]?.count || 0),
+          transactionsCount: Number(txRes.rows[0]?.count || 0),
+          totalRevenue: Number(txRes.rows[0]?.revenue || 0)
+        };
+      })
+    );
+
+    // 3. Global aggregates
+    const [globalProdRes, globalTxRes] = await Promise.all([
+      turso.execute('SELECT COUNT(*) as count FROM products'),
+      turso.execute('SELECT COUNT(*) as count, SUM(total) as revenue FROM transactions')
+    ]);
+
+    const totalStores = storesWithStats.length;
+    const totalProducts = Number(globalProdRes.rows[0]?.count || 0);
+    const totalTransactions = Number(globalTxRes.rows[0]?.count || 0);
+    const totalRevenue = Number(globalTxRes.rows[0]?.revenue || 0);
+
+    // 4. Latest transactions across all stores
+    const latestTxRes = await turso.execute(
+      'SELECT id, timestamp, date_formatted, total, payment_method, cashier_name, store_slug, customer_name FROM transactions ORDER BY timestamp DESC LIMIT 15'
+    );
+
+    const latestTransactions = latestTxRes.rows.map((r) => {
+      const storeSlug = r.store_slug ? String(r.store_slug) : 'admin';
+      const storeObj = storesWithStats.find((s) => s.slug.toLowerCase() === storeSlug.toLowerCase());
+      return {
+        id: String(r.id),
+        timestamp: String(r.timestamp),
+        dateFormatted: String(r.date_formatted),
+        total: Number(r.total),
+        paymentMethod: String(r.payment_method),
+        cashierName: String(r.cashier_name),
+        storeSlug,
+        storeName: storeObj ? storeObj.storeName : (storeSlug === 'admin' ? 'KASIRKU STORE' : storeSlug),
+        customerName: r.customer_name ? String(r.customer_name) : undefined
+      };
+    });
+
+    const latency = Date.now() - start;
+
+    res.json({
+      globalStats: {
+        totalStores,
+        totalProducts,
+        totalTransactions,
+        totalRevenue
+      },
+      stores: storesWithStats,
+      latestTransactions,
+      dbStatus: {
+        status: 'connected',
+        latency: `${latency}ms`,
+        database: 'Turso (LibSQL)',
+        host: 'mycasir3-reskydigiss-sys.aws-ap-northeast-1.turso.io'
+      }
+    });
+  } catch (error: any) {
+    console.error('Error in admin overview:', error);
+    res.status(500).json({ error: error.message || 'Gagal memuat data monitoring admin' });
+  }
+});
+
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // 2. Get All Products (Scoped by store slug)
 app.get('/api/products', async (req, res) => {
   try {
     const slug = (req.query.slug as string) || (req.query.store as string) || 'admin';
-    const result = await turso.execute({
-      sql: 'SELECT * FROM products WHERE store_slug = ? OR (store_slug IS NULL AND ? = ' + "'admin'" + ') ORDER BY id ASC',
-      args: [slug]
-    });
+    const result = await turso.execute(
+      slug === 'admin'
+        ? {
+            sql: 'SELECT * FROM products WHERE store_slug = ? OR store_slug IS NULL ORDER BY id ASC',
+            args: ['admin']
+          }
+        : {
+            sql: 'SELECT * FROM products WHERE store_slug = ? ORDER BY id ASC',
+            args: [slug]
+          }
+    );
 
     const products = result.rows.map((row) => ({
       id: String(row.id),
@@ -895,10 +1062,17 @@ app.patch('/api/products/:id/stock', async (req, res) => {
 app.get('/api/transactions', async (req, res) => {
   try {
     const slug = (req.query.slug as string) || (req.query.store as string) || 'admin';
-    const result = await turso.execute({
-      sql: 'SELECT * FROM transactions WHERE store_slug = ? OR (store_slug IS NULL AND ? = ' + "'admin'" + ') ORDER BY timestamp DESC',
-      args: [slug]
-    });
+    const result = await turso.execute(
+      slug === 'admin'
+        ? {
+            sql: 'SELECT * FROM transactions WHERE store_slug = ? OR store_slug IS NULL ORDER BY timestamp DESC',
+            args: ['admin']
+          }
+        : {
+            sql: 'SELECT * FROM transactions WHERE store_slug = ? ORDER BY timestamp DESC',
+            args: [slug]
+          }
+    );
 
     const transactions = result.rows.map((row) => {
       let items = [];

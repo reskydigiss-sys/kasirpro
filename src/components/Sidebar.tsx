@@ -26,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isDark = theme === 'glacier-dark';
 
   const navItems = [
+    { id: 'landing' as ActiveTab, label: 'Landing Page', icon: 'storefront' },
     { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: 'dashboard' },
     { id: 'kasir' as ActiveTab, label: 'Kasir', icon: 'point_of_sale' },
     { id: 'produk' as ActiveTab, label: 'Produk', icon: 'inventory_2' },
@@ -38,7 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { id: 'riwayat' as ActiveTab, label: 'Riwayat Penjualan', icon: 'receipt_long' },
     { id: 'laporan' as ActiveTab, label: 'Laporan', icon: 'analytics' },
-    { id: 'pengaturan' as ActiveTab, label: 'Pengaturan', icon: 'settings' }
+    { id: 'pengaturan' as ActiveTab, label: 'Pengaturan', icon: 'settings' },
+    { id: 'admin' as ActiveTab, label: 'Admin Pusat (Multi-Toko)', icon: 'admin_panel_settings', badge: 'Admin' }
   ];
 
   return (

@@ -19,6 +19,8 @@ import { SettingsView } from './components/SettingsView';
 import { PrintableReceipt } from './components/PrintableReceipt';
 import { AuthModal } from './components/AuthModal';
 import { UniquePageBanner } from './components/UniquePageBanner';
+import { LandingPageView } from './components/LandingPageView';
+import { AdminPortalView } from './components/AdminPortalView';
 import { formatDate } from './utils/formatters';
 import { api, DatabaseStatus } from './services/api';
 
@@ -89,7 +91,31 @@ export default function App() {
   });
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') === 'true' || params.get('view') === 'admin') {
+      return 'admin';
+    }
+    const tabParam = params.get('tab') as ActiveTab;
+    if (
+      tabParam &&
+      [
+        'landing',
+        'dashboard',
+        'kasir',
+        'produk',
+        'kategori',
+        'stok',
+        'riwayat',
+        'laporan',
+        'pengaturan',
+        'admin'
+      ].includes(tabParam)
+    ) {
+      return tabParam;
+    }
+    return 'landing';
+  });
 
   // Mobile drawer state
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -449,6 +475,10 @@ export default function App() {
           dbStatus={dbStatus}
           currentUser={currentUser}
           onOpenAuthModal={openAuthModalWithTab}
+          onNavigate={(tab) => {
+            setActiveTab(tab);
+            setHeaderSearch('');
+          }}
           onSearchChange={
             ['kasir', 'produk', 'stok', 'riwayat'].includes(activeTab)
               ? setHeaderSearch
@@ -465,13 +495,61 @@ export default function App() {
 
         {/* Tab Content Canvas */}
         <main id="main-content-canvas" className="flex-1 pt-18 min-h-0 overflow-y-auto">
-          {/* Top Banner indicating unique store page */}
-          <UniquePageBanner
-            currentUser={currentUser}
-            currentSlug={currentSlug}
-            theme={theme}
-            onOpenAuthModal={openAuthModalWithTab}
-          />
+          {/* Top Banner indicating unique store page (hide on landing and admin portal for clean look) */}
+          {activeTab !== 'landing' && activeTab !== 'admin' && (
+            <UniquePageBanner
+              currentUser={currentUser}
+              currentSlug={currentSlug}
+              theme={theme}
+              onOpenAuthModal={openAuthModalWithTab}
+            />
+          )}
+
+          {activeTab === 'landing' && (
+            <LandingPageView
+              products={products}
+              transactions={transactions}
+              currentUser={currentUser}
+              theme={theme}
+              dbStatus={dbStatus}
+              onNavigate={(tab) => {
+                setActiveTab(tab);
+                setHeaderSearch('');
+              }}
+              onOpenAuthModal={openAuthModalWithTab}
+              onToggleTheme={toggleTheme}
+            />
+          )}
+
+          {activeTab === 'admin' && (
+            <AdminPortalView
+              currentUser={currentUser}
+              theme={theme}
+              onNavigate={(tab) => {
+                setActiveTab(tab);
+                setHeaderSearch('');
+              }}
+              onSwitchStore={(slug) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('u', slug);
+                url.searchParams.delete('admin');
+                url.searchParams.set('tab', 'kasir');
+                window.history.pushState({}, '', url.toString());
+                setCurrentUser((prev) => ({
+                  ...prev,
+                  slug,
+                  storeName: slug === 'admin' ? 'KASIRKU STORE' : `Toko ${slug}`
+                }));
+                setActiveTab('kasir');
+              }}
+              onAdminLoginSuccess={(adminUser) => {
+                setCurrentUser(adminUser);
+              }}
+              onAdminLogout={() => {
+                setActiveTab('kasir');
+              }}
+            />
+          )}
 
           {activeTab === 'dashboard' && (
             <DashboardView
@@ -520,6 +598,9 @@ export default function App() {
             <InventoryView
               products={products}
               onUpdateStock={handleUpdateStock}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
               theme={theme}
             />
           )}

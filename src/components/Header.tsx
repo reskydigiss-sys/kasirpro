@@ -13,6 +13,7 @@ interface HeaderProps {
   dbStatus?: DatabaseStatus | null;
   currentUser?: User | null;
   onOpenAuthModal?: (tab?: 'login' | 'register' | 'monitor') => void;
+  onNavigate?: (tab: ActiveTab) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,7 +26,8 @@ export const Header: React.FC<HeaderProps> = ({
   searchPlaceholder = 'Cari...',
   dbStatus,
   currentUser,
-  onOpenAuthModal
+  onOpenAuthModal,
+  onNavigate
 }) => {
   const isDark = theme === 'glacier-dark';
   const [showNotifications, setShowNotifications] = useState(false);
@@ -33,6 +35,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getTitle = () => {
     switch (activeTab) {
+      case 'landing':
+        return 'Beranda & Info Platform';
+      case 'admin':
+        return 'Portal Super Admin & Monitoring Toko';
       case 'dashboard':
         return isDark ? 'Ringkasan Hari Ini' : 'Dashboard';
       case 'kasir':
@@ -261,6 +267,25 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* Super Admin Quick Portal Button */}
+        {onNavigate && (
+          <button
+            id="btn-header-admin-portal"
+            onClick={() => onNavigate('admin')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'admin'
+                ? 'bg-amber-500/20 text-amber-500 border-amber-500/40 ring-1 ring-amber-500/30'
+                : isDark
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+            }`}
+            title="Portal Login & Monitoring Super Admin Aplikasi"
+          >
+            <span className="material-symbols-outlined text-[17px]">shield_person</span>
+            <span className="hidden sm:inline">Admin Pusat</span>
+          </button>
+        )}
 
         {/* User Account Button & Quick Switcher */}
         {onOpenAuthModal && (

@@ -22,6 +22,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua Kategori');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -294,13 +295,9 @@ export const ProductList: React.FC<ProductListProps> = ({
                           </button>
                           <button
                             id={`btn-delete-prod-${prod.id}`}
-                            onClick={() => {
-                              if (confirm(`Yakin ingin menghapus produk "${prod.name}"?`)) {
-                                onDeleteProduct(prod.id);
-                              }
-                            }}
+                            onClick={() => setProductToDelete(prod)}
                             title="Hapus Produk"
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[20px]">delete</span>
                           </button>
@@ -604,6 +601,77 @@ export const ProductList: React.FC<ProductListProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {productToDelete && (
+        <div
+          id="modal-delete-product-confirm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+        >
+          <div
+            className={`relative rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150 border p-6 space-y-4 ${
+              isDark
+                ? 'bg-[#0f1524] border-red-500/30 text-slate-100'
+                : 'bg-white border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[24px]">warning</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold">Konfirmasi Hapus Produk</h3>
+                <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <div
+              className={`p-3.5 rounded-lg border text-xs space-y-1 ${
+                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}
+            >
+              <p className="font-semibold text-sm">{productToDelete.name}</p>
+              <div className="flex items-center gap-2 text-slate-500 font-mono">
+                <span>SKU: {productToDelete.sku}</span>
+                <span>·</span>
+                <span>Stok: {productToDelete.stock}</span>
+                <span>·</span>
+                <span>{formatRupiah(productToDelete.price)}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Produk ini akan dihapus permanen dari inventori toko dan cloud database Turso.
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setProductToDelete(null)}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold border cursor-pointer ${
+                  isDark
+                    ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-delete-product"
+                onClick={() => {
+                  onDeleteProduct(productToDelete.id);
+                  setProductToDelete(null);
+                }}
+                className="px-5 py-2 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <span>Ya, Hapus Produk</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
