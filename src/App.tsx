@@ -19,10 +19,12 @@ import { PromoView } from './components/PromoView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { PrintableReceipt } from './components/PrintableReceipt';
+import { GlobalPrinterModal, GlobalPrinterToast } from './components/GlobalPrinterModal';
 import { AuthModal } from './components/AuthModal';
 import { UniquePageBanner } from './components/UniquePageBanner';
 import { LandingPageView } from './components/LandingPageView';
 import { AdminPortalView } from './components/AdminPortalView';
+import { AccountPortalView } from './components/AccountPortalView';
 import { formatDate } from './utils/formatters';
 import { api, DatabaseStatus } from './services/api';
 
@@ -95,8 +97,27 @@ export default function App() {
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('admin') === 'true' || params.get('view') === 'admin') {
+    if (
+      params.get('admin') === 'true' ||
+      params.get('view') === 'admin' ||
+      params.get('portal') === 'admin' ||
+      params.get('tab') === 'admin'
+    ) {
       return 'admin';
+    }
+    if (
+      params.get('portal') === 'login' ||
+      params.get('auth') === 'login' ||
+      params.get('tab') === 'login'
+    ) {
+      return 'login';
+    }
+    if (
+      params.get('portal') === 'register' ||
+      params.get('auth') === 'register' ||
+      params.get('tab') === 'register'
+    ) {
+      return 'register';
     }
     const tabParam = params.get('tab') as ActiveTab;
     if (
@@ -113,13 +134,68 @@ export default function App() {
         'promo',
         'laporan',
         'pengaturan',
-        'admin'
+        'admin',
+        'login',
+        'register'
       ].includes(tabParam)
     ) {
       return tabParam;
     }
+    if (params.get('u')) {
+      return 'kasir';
+    }
     return 'landing';
   });
+
+  // Central Navigation & URL state sync
+  const navigateToTab = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+    setHeaderSearch('');
+    const url = new URL(window.location.href);
+    if (tab === 'admin') {
+      url.searchParams.set('tab', 'admin');
+      url.searchParams.set('portal', 'admin');
+    } else if (tab === 'login') {
+      url.searchParams.set('tab', 'login');
+      url.searchParams.set('portal', 'login');
+    } else if (tab === 'register') {
+      url.searchParams.set('tab', 'register');
+      url.searchParams.set('portal', 'register');
+    } else {
+      url.searchParams.set('tab', tab);
+      url.searchParams.delete('portal');
+      url.searchParams.delete('admin');
+    }
+    window.history.pushState({}, '', url.toString());
+  }, []);
+
+  // Popstate listener for browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlSlug = params.get('u');
+      if (urlSlug && urlSlug !== currentSlug) {
+        setCurrentUser(getInitialUser());
+      }
+      if (
+        params.get('admin') === 'true' ||
+        params.get('portal') === 'admin' ||
+        params.get('tab') === 'admin'
+      ) {
+        setActiveTab('admin');
+      } else if (params.get('portal') === 'login' || params.get('tab') === 'login') {
+        setActiveTab('login');
+      } else if (params.get('portal') === 'register' || params.get('tab') === 'register') {
+        setActiveTab('register');
+      } else {
+        const tab = params.get('tab') as ActiveTab;
+        if (tab) setActiveTab(tab);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentSlug]);
 
   // Mobile drawer state
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -750,10 +826,7 @@ export default function App() {
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setHeaderSearch('');
-        }}
+        onTabChange={navigateToTab}
         theme={theme}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
@@ -774,10 +847,7 @@ export default function App() {
           dbStatus={dbStatus}
           currentUser={currentUser}
           onOpenAuthModal={openAuthModalWithTab}
-          onNavigate={(tab) => {
-            setActiveTab(tab);
-            setHeaderSearch('');
-          }}
+          onNavigate={navigateToTab}
           onSearchChange={
             ['kasir', 'produk', 'stok', 'riwayat', 'pelanggan', 'promo'].includes(activeTab)
               ? setHeaderSearch
@@ -798,13 +868,14 @@ export default function App() {
 
         {/* Tab Content Canvas */}
         <main id="main-content-canvas" className="flex-1 pt-18 min-h-0 overflow-y-auto">
-          {/* Top Banner indicating unique store page (hide on landing and admin portal for clean look) */}
-          {activeTab !== 'landing' && activeTab !== 'admin' && (
+          {/* Top Banner indicating unique store page (hide on landing, admin, login, register for clean look) */}
+          {activeTab !== 'landing' && activeTab !== 'admin' && activeTab !== 'login' && activeTab !== 'register' && (
             <UniquePageBanner
               currentUser={currentUser}
               currentSlug={currentSlug}
               theme={theme}
               onOpenAuthModal={openAuthModalWithTab}
+              onNavigate={navigateToTab}
             />
           )}
 
@@ -815,26 +886,26 @@ export default function App() {
               currentUser={currentUser}
               theme={theme}
               dbStatus={dbStatus}
-              onNavigate={(tab) => {
-                setActiveTab(tab);
-                setHeaderSearch('');
-              }}
+              onNavigate={navigateToTab}
               onOpenAuthModal={openAuthModalWithTab}
               onToggleTheme={toggleTheme}
             />
           )}
 
-          {activeTab === 'admin' && (
-            <AdminPortalView
-              currentUser={currentUser}
+          {(activeTab === 'login' || activeTab === 'register') && (
+            <AccountPortalView
+              initialMode={activeTab === 'register' ? 'register' : 'login'}
               theme={theme}
-              onNavigate={(tab) => {
-                setActiveTab(tab);
-                setHeaderSearch('');
+              currentUser={currentUser}
+              onLoginSuccess={(user) => {
+                handleLoginSuccess(user);
+                navigateToTab('kasir');
               }}
+              onNavigate={navigateToTab}
               onSwitchStore={(slug) => {
                 const url = new URL(window.location.href);
                 url.searchParams.set('u', slug);
+                url.searchParams.delete('portal');
                 url.searchParams.delete('admin');
                 url.searchParams.set('tab', 'kasir');
                 window.history.pushState({}, '', url.toString());
@@ -843,13 +914,35 @@ export default function App() {
                   slug,
                   storeName: slug === 'admin' ? 'KASIRKU STORE' : `Toko ${slug}`
                 }));
-                setActiveTab('kasir');
+                navigateToTab('kasir');
+              }}
+            />
+          )}
+
+          {activeTab === 'admin' && (
+            <AdminPortalView
+              currentUser={currentUser}
+              theme={theme}
+              onNavigate={navigateToTab}
+              onSwitchStore={(slug) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('u', slug);
+                url.searchParams.delete('admin');
+                url.searchParams.delete('portal');
+                url.searchParams.set('tab', 'kasir');
+                window.history.pushState({}, '', url.toString());
+                setCurrentUser((prev) => ({
+                  ...prev,
+                  slug,
+                  storeName: slug === 'admin' ? 'KASIRKU STORE' : `Toko ${slug}`
+                }));
+                navigateToTab('kasir');
               }}
               onAdminLoginSuccess={(adminUser) => {
                 setCurrentUser(adminUser);
               }}
               onAdminLogout={() => {
-                setActiveTab('kasir');
+                navigateToTab('kasir');
               }}
             />
           )}
@@ -980,6 +1073,10 @@ export default function App() {
         theme={theme}
         initialTab={authModalTab}
       />
+
+      {/* Global Printer Connection Modal & Live Toast Notification */}
+      <GlobalPrinterModal theme={theme} />
+      <GlobalPrinterToast theme={theme} />
 
       {/* Hidden print receipt rendered for standard browser print (Cetak Struk) */}
       <PrintableReceipt transaction={printableTx || transactions[0] || null} />

@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { User, AppTheme } from '../types';
+import { User, AppTheme, ActiveTab } from '../types';
 
 interface UniquePageBannerProps {
   currentUser: User | null;
   currentSlug: string;
   theme: AppTheme;
   onOpenAuthModal: (tab?: 'login' | 'register' | 'monitor') => void;
+  onNavigate?: (tab: ActiveTab) => void;
 }
 
 export const UniquePageBanner: React.FC<UniquePageBannerProps> = ({
   currentUser,
   currentSlug,
   theme,
-  onOpenAuthModal
+  onOpenAuthModal,
+  onNavigate
 }) => {
   const isDark = theme === 'glacier-dark';
   const [copied, setCopied] = useState(false);
@@ -96,28 +98,45 @@ export const UniquePageBanner: React.FC<UniquePageBannerProps> = ({
             <span className="font-mono">{copied ? 'Tersalin' : `Salin Link`}</span>
           </button>
 
-          {/* Monitor all unique pages button */}
+          {/* Monitor / Admin Portal button */}
           <button
             id="btn-monitor-stores"
-            onClick={() => onOpenAuthModal('monitor')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-colors ${
+            onClick={() => (onNavigate ? onNavigate('admin') : onOpenAuthModal('monitor'))}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-colors cursor-pointer ${
+              isDark
+                ? 'bg-amber-950/20 border-amber-800/40 text-amber-300 hover:text-white hover:bg-amber-900/40'
+                : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
+            }`}
+            title="Buka Portal Kredensial Super Admin & Monitoring Toko (?portal=admin)"
+          >
+            <span className="material-symbols-outlined text-[15px]">shield_person</span>
+            <span className="hidden sm:inline">Portal Admin</span>
+          </button>
+
+          {/* Login button */}
+          <button
+            id="btn-banner-login"
+            onClick={() => (onNavigate ? onNavigate('login') : onOpenAuthModal('login'))}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-colors cursor-pointer ${
               isDark
                 ? 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
+            title="Buka Portal Masuk Akun Toko (?portal=login)"
           >
-            <span className="material-symbols-outlined text-[15px]">visibility</span>
-            <span className="hidden sm:inline">Pantau Toko</span>
+            <span className="material-symbols-outlined text-[15px]">login</span>
+            <span>Masuk</span>
           </button>
 
           {/* Create new account / store button */}
           <button
             id="btn-banner-create-account"
-            onClick={() => onOpenAuthModal('register')}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs"
+            onClick={() => (onNavigate ? onNavigate('register') : onOpenAuthModal('register'))}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+            title="Buka Portal Pendaftaran Toko Baru (?portal=register)"
           >
-            <span className="material-symbols-outlined text-[15px]">person_add</span>
-            <span>Buat Akun Baru</span>
+            <span className="material-symbols-outlined text-[15px]">add_business</span>
+            <span>Daftar Toko Baru</span>
           </button>
         </div>
       </div>

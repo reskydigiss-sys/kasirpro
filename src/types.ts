@@ -107,7 +107,9 @@ export type ActiveTab =
   | 'promo'
   | 'laporan'
   | 'pengaturan'
-  | 'admin';
+  | 'admin'
+  | 'login'
+  | 'register';
 
 export type AppTheme = 'corporate-light' | 'glacier-dark';
 
@@ -127,3 +129,5 @@ export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
 }
+
+export * from './types/printer';

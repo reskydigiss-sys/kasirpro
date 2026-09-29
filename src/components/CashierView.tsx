@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, CartItem, CategoryType, AppTheme, PaymentMethod, Transaction, CategoryItem, Customer, Promo } from '../types';
 import { formatRupiah, parseRupiahInput } from '../utils/formatters';
 import { playScannerBeep } from '../utils/scannerSound';
+import { usePrinter } from '../context/PrinterContext';
 
 interface CashierViewProps {
   products: Product[];
@@ -86,6 +87,22 @@ export const CashierView: React.FC<CashierViewProps> = ({
     }, 4000);
     return () => clearTimeout(timer);
   }, [lastScannedFeedback]);
+
+  // Global Printer Hook
+  const {
+    connectedPrinter,
+    status: printerStatus,
+    settings: printerSettings,
+    printReceipt,
+    setOpenModal: setOpenPrinterModal
+  } = usePrinter();
+
+  // Auto-print effect when checkout succeeds
+  useEffect(() => {
+    if (checkoutSuccessTx && printerSettings.autoPrintOnCheckout) {
+      printReceipt(checkoutSuccessTx);
+    }
+  }, [checkoutSuccessTx, printerSettings.autoPrintOnCheckout, printReceipt]);
 
   const toggleBeep = () => {
     setIsBeepEnabled((prev) => {
@@ -1245,17 +1262,57 @@ export const CashierView: React.FC<CashierViewProps> = ({
               </div>
             </div>
 
+            {/* Printer status pill in checkout success */}
+            <div
+              className={`p-2.5 rounded-lg border text-xs flex items-center justify-between ${
+                printerStatus === 'connected'
+                  ? isDark
+                    ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-300'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : isDark
+                  ? 'bg-amber-950/20 border-amber-800/40 text-amber-300'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <span className="material-symbols-outlined text-[18px] shrink-0">
+                  {printerStatus === 'connected' ? 'print' : 'print_disabled'}
+                </span>
+                <div className="truncate text-left">
+                  <p className="font-bold truncate text-[11px]">
+                    {printerStatus === 'connected'
+                      ? connectedPrinter?.name
+                      : 'Printer Belum Terhubung'}
+                  </p>
+                  <p className="text-[10px] opacity-80">
+                    {printerStatus === 'connected'
+                      ? `${connectedPrinter?.type.toUpperCase()} • ${connectedPrinter?.paperWidth || '58mm'}${printerSettings.autoPrintOnCheckout ? ' • Auto-Print Aktif' : ''}`
+                      : 'Klik ubah untuk deteksi printer Bluetooth/USB'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenPrinterModal(true)}
+                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-2 cursor-pointer"
+              >
+                {printerStatus === 'connected' ? 'Ganti' : 'Hubungkan'}
+              </button>
+            </div>
+
             {/* Action buttons */}
             <div className="space-y-2">
               <button
                 id="btn-print-receipt-modal"
                 onClick={() => {
-                  window.print();
+                  printReceipt(checkoutSuccessTx);
                 }}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">print</span>
-                <span>Cetak Struk Transaksi</span>
+                <span>
+                  Cetak Struk Transaksi ({connectedPrinter?.paperWidth || '58mm'})
+                </span>
               </button>
               <button
                 id="btn-new-transaction"

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, AppTheme, PaymentMethod, Product, Customer } from '../types';
 import { formatRupiah } from '../utils/formatters';
+import { usePrinter } from '../context/PrinterContext';
 
 interface SalesHistoryViewProps {
   transactions: Transaction[];
@@ -31,6 +32,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isDetailOpen, setIsDetailOpen] = useState(true);
+
+  const { connectedPrinter, printReceipt, setOpenModal: setOpenPrinterModal } = usePrinter();
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -107,7 +110,11 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
   }, [transactions, searchQuery, selectedMethod, selectedStatus, startDate, endDate]);
 
   const handlePrint = () => {
-    window.print();
+    if (activeTx) {
+      printReceipt(activeTx);
+    } else {
+      window.print();
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -682,9 +689,10 @@ Kembalian:         ${formatRupiah(activeTx.change)}
                 id="btn-print-receipt"
                 onClick={handlePrint}
                 className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                title={`Cetak via ${connectedPrinter?.name || 'Printer'} (${connectedPrinter?.paperWidth || '58mm'})`}
               >
                 <span className="material-symbols-outlined text-[18px]">print</span>
-                <span>Cetak Struk</span>
+                <span>Cetak ({connectedPrinter?.paperWidth || '58mm'})</span>
               </button>
             </div>
           </div>

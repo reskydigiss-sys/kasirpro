@@ -368,13 +368,33 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
           </div>
 
           {/* Navigation Back Link */}
-          <div className="text-center space-y-2 text-xs">
+          <div className="text-center space-y-2.5 text-xs">
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onNavigate('login')}
+                className="text-blue-600 dark:text-sky-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">login</span>
+                <span>Portal Masuk Akun Toko</span>
+              </button>
+              <span className="text-slate-400">•</span>
+              <button
+                type="button"
+                onClick={() => onNavigate('register')}
+                className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">add_business</span>
+                <span>Daftar Toko Baru (?u=slug)</span>
+              </button>
+            </div>
+
             <button
               onClick={() => onNavigate('kasir')}
               className="text-slate-500 hover:text-blue-600 dark:hover:text-sky-400 font-semibold flex items-center justify-center gap-1 mx-auto cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              <span>Bukan Admin? Kembali ke Mesin Kasir Toko</span>
+              <span>Kembali ke Mesin Kasir Toko</span>
             </button>
             <p className="text-[11px] text-slate-400">
               KASIRKU Cloud Operational System • Turso LibSQL Edge Database

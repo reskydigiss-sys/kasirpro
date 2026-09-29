@@ -162,10 +162,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => onOpenAuthModal('monitor')}
+            onClick={() => onNavigate('admin')}
             className="hover:text-blue-600 dark:hover:text-sky-400 underline font-medium cursor-pointer"
           >
-            Monitor Semua Toko ({currentUser.username})
+            Portal Admin ({currentUser.username})
+          </button>
+          <span className="text-slate-300 dark:text-slate-700">|</span>
+          <button
+            onClick={() => onNavigate('login')}
+            className="hover:text-blue-600 dark:hover:text-sky-400 underline font-medium cursor-pointer"
+          >
+            Portal Masuk
           </button>
           <span className="text-slate-300 dark:text-slate-700">|</span>
           <button
@@ -214,7 +221,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             <button
               id="hero-btn-register-store"
-              onClick={() => onOpenAuthModal('register')}
+              onClick={() => onNavigate('register')}
               className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-sm border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 isDark
                   ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-100'
@@ -602,7 +609,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </p>
               </div>
               <button
-                onClick={() => onOpenAuthModal('register')}
+                onClick={() => onNavigate('register')}
                 className="text-xs text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1 hover:underline cursor-pointer pt-2"
               >
                 Buat Halaman Toko <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
@@ -969,7 +976,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <span>Masuk ke Mesin Kasir</span>
             </button>
             <button
-              onClick={() => onOpenAuthModal('register')}
+              onClick={() => onNavigate('register')}
               className="w-full sm:w-auto px-7 py-3.5 bg-blue-700 hover:bg-blue-800 border border-blue-400 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">add_business</span>

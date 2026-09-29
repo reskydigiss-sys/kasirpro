@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActiveTab, AppTheme, User } from '../types';
 import { DatabaseStatus } from '../services/api';
+import { usePrinter } from '../context/PrinterContext';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -32,13 +33,18 @@ export const Header: React.FC<HeaderProps> = ({
   const isDark = theme === 'glacier-dark';
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const { status: printerStatus, connectedPrinter, setOpenModal } = usePrinter();
 
   const getTitle = () => {
     switch (activeTab) {
       case 'landing':
         return 'Beranda & Info Platform';
       case 'admin':
-        return 'Portal Super Admin & Monitoring Toko';
+        return 'Portal Kredensial Super Admin';
+      case 'login':
+        return 'Portal Masuk Akun Toko';
+      case 'register':
+        return 'Portal Pendaftaran Toko Baru';
       case 'dashboard':
         return isDark ? 'Ringkasan Hari Ini' : 'Dashboard';
       case 'kasir':
@@ -127,6 +133,53 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Controls: Turso DB status, Theme Toggle, Notifications, Help */}
       <div className="flex items-center gap-2">
+        {/* Global Printer Connection Badge */}
+        <button
+          id="header-printer-status-btn"
+          type="button"
+          onClick={() => setOpenModal(true)}
+          title={
+            printerStatus === 'connected'
+              ? `Printer Terhubung: ${connectedPrinter?.name} (${connectedPrinter?.type.toUpperCase()} ${connectedPrinter?.paperWidth}) - Klik untuk kelola`
+              : printerStatus === 'searching'
+              ? 'Mencari printer thermal mini...'
+              : 'Printer tidak terhubung - Klik untuk menghubungkan Bluetooth/USB'
+          }
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all cursor-pointer ${
+            printerStatus === 'connected'
+              ? isDark
+                ? 'bg-sky-950/40 text-sky-300 border-sky-800/60 hover:bg-sky-900/50'
+                : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+              : printerStatus === 'searching'
+              ? isDark
+                ? 'bg-amber-950/40 text-amber-300 border-amber-800/60 hover:bg-amber-900/50'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+              : isDark
+              ? 'bg-slate-800/60 text-slate-400 border-slate-700 hover:bg-slate-800'
+              : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[15px]">
+            {printerStatus === 'connected' ? 'print' : printerStatus === 'searching' ? 'bluetooth_searching' : 'print_disabled'}
+          </span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              printerStatus === 'connected'
+                ? 'bg-emerald-500 animate-pulse'
+                : printerStatus === 'searching'
+                ? 'bg-amber-500 animate-ping'
+                : 'bg-rose-500'
+            }`}
+          />
+          <span className="font-mono text-[11px] hidden sm:inline truncate max-w-[130px]">
+            {printerStatus === 'connected'
+              ? (connectedPrinter?.name?.split(' ')[0] || 'POS') + ' (' + (connectedPrinter?.paperWidth || '58mm') + ')'
+              : printerStatus === 'searching'
+              ? 'Cari Printer...'
+              : 'Printer: Off'}
+          </span>
+        </button>
+
         {/* Turso Database Badge */}
         <div
           id="turso-status-indicator"

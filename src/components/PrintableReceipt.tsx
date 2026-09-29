@@ -1,16 +1,25 @@
 import React from 'react';
 import { Transaction } from '../types';
 import { formatRupiah } from '../utils/formatters';
+import { usePrinter } from '../context/PrinterContext';
 
 interface PrintableReceiptProps {
   transaction: Transaction | null;
 }
 
 export const PrintableReceipt: React.FC<PrintableReceiptProps> = ({ transaction }) => {
+  const { connectedPrinter, settings } = usePrinter();
   if (!transaction) return null;
 
+  const paperWidth = connectedPrinter?.paperWidth || settings?.paperWidth || '58mm';
+
   return (
-    <div id="printable-receipt" className="hidden print:block p-4 font-mono text-[12px] leading-tight text-black max-w-[80mm] mx-auto bg-white">
+    <div
+      id="printable-receipt"
+      className={`hidden print:block p-3 font-mono text-[11px] leading-tight text-black ${
+        paperWidth === '58mm' ? 'max-w-[58mm]' : 'max-w-[80mm]'
+      } mx-auto bg-white`}
+    >
       {/* Receipt Header */}
       <div className="text-center pb-2 border-b border-dashed border-black">
         <h1 className="text-base font-bold tracking-wider">KASIRKU STORE</h1>

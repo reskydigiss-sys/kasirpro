@@ -42,7 +42,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'promo' as ActiveTab, label: 'Diskon & Promo', icon: 'local_offer' },
     { id: 'laporan' as ActiveTab, label: 'Laporan', icon: 'analytics' },
     { id: 'pengaturan' as ActiveTab, label: 'Pengaturan', icon: 'settings' },
-    { id: 'admin' as ActiveTab, label: 'Admin Pusat (Multi-Toko)', icon: 'admin_panel_settings', badge: 'Admin' }
+    { id: 'login' as ActiveTab, label: 'Portal Masuk Akun', icon: 'login', badge: 'Login' },
+    { id: 'register' as ActiveTab, label: 'Daftar Toko Baru', icon: 'add_business', badge: 'Baru' },
+    { id: 'admin' as ActiveTab, label: 'Portal Kredensial Admin', icon: 'admin_panel_settings', badge: 'Super Admin' }
   ];
 
   return (
