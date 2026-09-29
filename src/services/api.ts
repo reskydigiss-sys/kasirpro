@@ -92,7 +92,21 @@ export const api = {
     name: string;
     storeName: string;
     category?: string;
-  }): Promise<{ user: User }> {
+    avatar?: string;
+    starterProducts?: any[];
+    starterCategories?: any[];
+    starterPromos?: any[];
+    starterCustomers?: any[];
+  }): Promise<{
+    user: User;
+    itemsCreated?: {
+      products: number;
+      categories: number;
+      promos: number;
+      customers: number;
+    };
+    uniquePageUrl?: string;
+  }> {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

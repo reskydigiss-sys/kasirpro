@@ -2,6 +2,7 @@ import React, { useState, useEffect, useId } from 'react';
 import { User, AppTheme, ActiveTab } from '../types';
 import { api, AdminOverviewData, StoreSummaryItem, AdminLatestTx } from '../services/api';
 import { formatRupiah, formatDate } from '../utils/formatters';
+import { JSON_BUSINESS_TEMPLATES } from '../data/jsonTemplates';
 
 interface AdminPortalViewProps {
   currentUser: User;
@@ -57,6 +58,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
 
   // New Store Modal State
   const [isCreateStoreModalOpen, setIsCreateStoreModalOpen] = useState(false);
+  const [createStoreModalTab, setCreateStoreModalTab] = useState<'manual' | 'json'>('json');
   const [newStoreData, setNewStoreData] = useState({
     name: '',
     storeName: '',
@@ -64,9 +66,48 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
     password: '',
     category: 'Retail & Minimarket'
   });
+  const [selectedAdminJsonTemplate, setSelectedAdminJsonTemplate] = useState<string>('minimarket');
+  const [adminJsonText, setAdminJsonText] = useState<string>(() => {
+    return JSON.stringify(JSON_BUSINESS_TEMPLATES[0].data, null, 2);
+  });
+  const [adminJsonError, setAdminJsonError] = useState<string | null>(null);
   const [creatingStore, setCreatingStore] = useState(false);
   const [createStoreError, setCreateStoreError] = useState('');
   const [createStoreSuccess, setCreateStoreSuccess] = useState('');
+
+  // Handle template selection in Admin Modal
+  const handleSelectAdminJsonTemplate = (id: string) => {
+    setSelectedAdminJsonTemplate(id);
+    const tmpl = JSON_BUSINESS_TEMPLATES.find((t) => t.id === id);
+    if (tmpl) {
+      setAdminJsonText(JSON.stringify(tmpl.data, null, 2));
+      setAdminJsonError(null);
+    }
+  };
+
+  // Export all stores summary & schema as JSON
+  const handleExportAllStoresJson = () => {
+    if (!overviewData) return;
+    const exportPayload = {
+      exportedAt: new Date().toISOString(),
+      platform: 'KASIRKU Cloud Operational System',
+      database: overviewData.dbStatus,
+      globalStats: overviewData.globalStats,
+      stores: overviewData.stores.map((s) => ({
+        ...s,
+        uniqueUrl: `${window.location.origin}/?u=${s.slug}`
+      }))
+    };
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+      type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kasirku-all-stores-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Load Admin Overview Data when authenticated
   const fetchOverview = async () => {
@@ -176,6 +217,53 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
       }, 1800);
     } catch (err: any) {
       setCreateStoreError(err.message || 'Gagal mendaftarkan toko baru');
+    } finally {
+      setCreatingStore(false);
+    }
+  };
+
+  const handleCreateStoreFromJson = async () => {
+    setCreateStoreError('');
+    setCreateStoreSuccess('');
+    setAdminJsonError(null);
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(adminJsonText);
+    } catch (e: any) {
+      setAdminJsonError(`Format JSON tidak valid: ${e.message}`);
+      return;
+    }
+
+    const store = parsed?.store;
+    if (!store?.storeName || !store?.username || !store?.password) {
+      setAdminJsonError('Objek "store" wajib memiliki "storeName", "username", dan "password".');
+      return;
+    }
+
+    setCreatingStore(true);
+    try {
+      const res = await api.register({
+        name: store.name || store.storeName,
+        storeName: store.storeName,
+        username: store.username.toLowerCase().trim(),
+        password: store.password,
+        category: store.category || 'Retail & Minimarket',
+        starterProducts: parsed.starterProducts || [],
+        starterCategories: parsed.starterCategories || [],
+        starterPromos: parsed.starterPromos || []
+      });
+
+      setCreateStoreSuccess(
+        `Toko "${res.user.storeName}" berhasil dibuat dari skema JSON! Slug: ?u=${res.user.slug}`
+      );
+      await fetchOverview();
+      setTimeout(() => {
+        setIsCreateStoreModalOpen(false);
+        setCreateStoreSuccess('');
+      }, 1800);
+    } catch (err: any) {
+      setCreateStoreError(err.message || 'Gagal mendaftarkan toko dari JSON');
     } finally {
       setCreatingStore(false);
     }
@@ -465,11 +553,43 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
           </button>
 
           <button
+            onClick={handleExportAllStoresJson}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+              isDark
+                ? 'border-emerald-800 bg-emerald-950/30 hover:bg-emerald-950/60 text-emerald-300'
+                : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+            }`}
+            title="Ekspor seluruh data toko ke file JSON"
+          >
+            <span className="material-symbols-outlined text-[16px]">download</span>
+            <span>Ekspor JSON</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.set('tab', 'login');
+              url.searchParams.set('portal', 'login');
+              window.history.pushState({}, '', url.toString());
+              onNavigate('login');
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+              isDark
+                ? 'border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-200'
+                : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+            title="Buka Portal Masuk Akun Toko"
+          >
+            <span className="material-symbols-outlined text-[16px]">login</span>
+            <span>Portal Login Toko</span>
+          </button>
+
+          <button
             onClick={() => setIsCreateStoreModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">add_business</span>
-            <span>Daftar Toko Baru</span>
+            <span>Daftar Toko (JSON/Manual)</span>
           </button>
 
           <button

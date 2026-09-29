@@ -769,70 +769,155 @@ app.post('/api/auth/register', async (req, res) => {
       ]
     });
 
-    // Provide 4 starter products tailored for this new store
-    const starterProducts = [
-      {
-        id: `prd-${slug}-1`,
-        name: 'Produk Unggulan 1',
-        sku: `${slug.slice(0, 3).toUpperCase()}-001`,
-        category: 'Makanan',
-        price: 15000,
-        stock: 50,
-        imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
-        description: 'Produk contoh untuk memulai toko Anda'
-      },
-      {
-        id: `prd-${slug}-2`,
-        name: 'Minuman Segar Dingin',
-        sku: `${slug.slice(0, 3).toUpperCase()}-002`,
-        category: 'Minuman',
-        price: 8000,
-        stock: 100,
-        imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60',
-        description: 'Minuman pelepas dahaga'
-      },
-      {
-        id: `prd-${slug}-3`,
-        name: 'Paket Spesial Toko',
-        sku: `${slug.slice(0, 3).toUpperCase()}-003`,
-        category: 'Lainnya',
-        price: 35000,
-        stock: 25,
-        imageUrl: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500&auto=format&fit=crop&q=60',
-        description: 'Paket hemat untuk pelanggan setia'
-      }
-    ];
+    // 1. Process and Insert Categories for this new store (from JSON or default)
+    let finalCategories = Array.isArray(req.body.starterCategories) && req.body.starterCategories.length > 0
+      ? req.body.starterCategories
+      : [
+          { id: `cat-${slug}-1`, name: 'Makanan', icon: 'restaurant', color: 'amber', description: 'Menu makanan utama & cemilan' },
+          { id: `cat-${slug}-2`, name: 'Minuman', icon: 'local_cafe', color: 'emerald', description: 'Minuman dingin dan hangat' },
+          { id: `cat-${slug}-3`, name: 'Lainnya', icon: 'category', color: 'purple', description: 'Produk pelengkap lainnya' }
+        ];
 
-    for (const p of starterProducts) {
-      await turso.execute({
-        sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description, store_slug)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          p.id,
-          p.name,
-          p.sku,
-          p.category,
-          p.price,
-          p.stock,
-          p.imageUrl,
-          p.description,
-          slug
-        ]
-      });
+    let insertedCategoriesCount = 0;
+    for (let i = 0; i < finalCategories.length; i++) {
+      const c = finalCategories[i];
+      const catId = c.id || `cat-${slug}-${i + 1}`;
+      try {
+        await turso.execute({
+          sql: `INSERT INTO categories (id, name, icon, description, color, store_slug)
+                VALUES (?, ?, ?, ?, ?, ?)`,
+          args: [
+            catId,
+            c.name || `Kategori ${i + 1}`,
+            c.icon || 'category',
+            c.description || '',
+            c.color || 'blue',
+            slug
+          ]
+        });
+        insertedCategoriesCount++;
+      } catch (errCat) {
+        console.warn('Warning inserting category for store:', errCat);
+      }
     }
 
-    // Provide starter categories for this new store
-    const starterCategories = [
-      { id: `cat-${slug}-1`, name: 'Makanan', icon: 'restaurant', color: 'amber', description: 'Menu makanan utama & cemilan' },
-      { id: `cat-${slug}-2`, name: 'Minuman', icon: 'local_cafe', color: 'emerald', description: 'Minuman dingin dan hangat' },
-      { id: `cat-${slug}-3`, name: 'Lainnya', icon: 'category', color: 'purple', description: 'Produk pelengkap lainnya' }
-    ];
-    for (const c of starterCategories) {
-      await turso.execute({
-        sql: `INSERT INTO categories (id, name, icon, description, color, store_slug)
-              VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [c.id, c.name, c.icon, c.description, c.color, slug]
-      });
+    // 2. Process and Insert Products for this new store (from JSON or default)
+    let finalProducts = Array.isArray(req.body.starterProducts) && req.body.starterProducts.length > 0
+      ? req.body.starterProducts
+      : [
+          {
+            id: `prd-${slug}-1`,
+            name: 'Produk Unggulan 1',
+            sku: `${slug.slice(0, 3).toUpperCase()}-001`,
+            category: finalCategories[0]?.name || 'Makanan',
+            price: 15000,
+            stock: 50,
+            imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
+            description: 'Produk contoh untuk memulai toko Anda'
+          },
+          {
+            id: `prd-${slug}-2`,
+            name: 'Minuman Segar Dingin',
+            sku: `${slug.slice(0, 3).toUpperCase()}-002`,
+            category: finalCategories[1]?.name || 'Minuman',
+            price: 8000,
+            stock: 100,
+            imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60',
+            description: 'Minuman pelepas dahaga'
+          },
+          {
+            id: `prd-${slug}-3`,
+            name: 'Paket Spesial Toko',
+            sku: `${slug.slice(0, 3).toUpperCase()}-003`,
+            category: finalCategories[2]?.name || 'Lainnya',
+            price: 35000,
+            stock: 25,
+            imageUrl: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500&auto=format&fit=crop&q=60',
+            description: 'Paket hemat untuk pelanggan setia'
+          }
+        ];
+
+    let insertedProductsCount = 0;
+    for (let i = 0; i < finalProducts.length; i++) {
+      const p = finalProducts[i];
+      const prodId = p.id || `prd-${slug}-${Date.now()}-${i + 1}`;
+      const prodSku = p.sku || `${slug.slice(0, 3).toUpperCase()}-${String(i + 1).padStart(3, '0')}`;
+      try {
+        await turso.execute({
+          sql: `INSERT INTO products (id, name, sku, category, price, stock, image_url, description, store_slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            prodId,
+            p.name || `Produk ${i + 1}`,
+            prodSku,
+            p.category || 'Umum',
+            Number(p.price) || 0,
+            Number(p.stock) ?? 10,
+            p.imageUrl || '',
+            p.description || '',
+            slug
+          ]
+        });
+        insertedProductsCount++;
+      } catch (errProd) {
+        console.warn('Warning inserting product for store:', errProd);
+      }
+    }
+
+    // 3. Process and Insert Promos if provided in JSON
+    let insertedPromosCount = 0;
+    if (Array.isArray(req.body.starterPromos) && req.body.starterPromos.length > 0) {
+      for (let i = 0; i < req.body.starterPromos.length; i++) {
+        const pr = req.body.starterPromos[i];
+        try {
+          await turso.execute({
+            sql: `INSERT INTO promos (id, code, title, type, value, min_spend, is_active, store_slug)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              pr.id || `prm-${slug}-${i + 1}`,
+              String(pr.code || `DISKON${i + 1}`).toUpperCase().trim(),
+              pr.title || `Promo Spesial ${i + 1}`,
+              pr.type || 'percentage',
+              Number(pr.value) || 10,
+              Number(pr.min_spend) || 0,
+              pr.is_active !== undefined ? (pr.is_active ? 1 : 0) : 1,
+              slug
+            ]
+          });
+          insertedPromosCount++;
+        } catch (errPromo) {
+          console.warn('Warning inserting promo for store:', errPromo);
+        }
+      }
+    }
+
+    // 4. Process and Insert Customers if provided in JSON
+    let insertedCustomersCount = 0;
+    if (Array.isArray(req.body.starterCustomers) && req.body.starterCustomers.length > 0) {
+      for (let i = 0; i < req.body.starterCustomers.length; i++) {
+        const cu = req.body.starterCustomers[i];
+        try {
+          await turso.execute({
+            sql: `INSERT INTO customers (id, name, phone, email, address, member_level, points, total_spent, transaction_count, store_slug)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              cu.id || `cust-${slug}-${i + 1}`,
+              cu.name || `Pelanggan ${i + 1}`,
+              cu.phone || `08${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+              cu.email || '',
+              cu.address || '',
+              cu.member_level || 'Reguler',
+              Number(cu.points) || 0,
+              Number(cu.total_spent) || 0,
+              Number(cu.transaction_count) || 0,
+              slug
+            ]
+          });
+          insertedCustomersCount++;
+        } catch (errCust) {
+          console.warn('Warning inserting customer for store:', errCust);
+        }
+      }
     }
 
     const newUser = {
@@ -846,7 +931,16 @@ app.post('/api/auth/register', async (req, res) => {
       avatar
     };
 
-    res.status(201).json({ user: newUser });
+    res.status(201).json({
+      user: newUser,
+      itemsCreated: {
+        products: insertedProductsCount,
+        categories: insertedCategoriesCount,
+        promos: insertedPromosCount,
+        customers: insertedCustomersCount
+      },
+      uniquePageUrl: `?u=${slug}&tab=kasir`
+    });
   } catch (error: any) {
     console.error('Error registering user:', error);
     res.status(500).json({ error: error.message || 'Gagal mendaftarkan pengguna baru' });
