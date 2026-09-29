@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Product, CategoryType, AppTheme } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Product, CategoryType, AppTheme, CategoryItem } from '../types';
 import { formatRupiah } from '../utils/formatters';
 
 interface ProductListProps {
   products: Product[];
+  categories?: CategoryItem[];
   onAddProduct: (product: Omit<Product, 'id'>) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
@@ -12,6 +13,7 @@ interface ProductListProps {
 
 export const ProductList: React.FC<ProductListProps> = ({
   products,
+  categories,
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
@@ -23,6 +25,18 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
+  // Dynamic category list from database categories or fallback
+  const categoryNames = useMemo(() => {
+    if (categories && categories.length > 0) {
+      return categories.map((c) => c.name);
+    }
+    const set = new Set<string>(['Alat Tulis', 'Makanan', 'Minuman', 'Lainnya']);
+    products.forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
+    return Array.from(set);
+  }, [categories, products]);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -145,10 +159,11 @@ export const ProductList: React.FC<ProductListProps> = ({
             }`}
           >
             <option value="Semua Kategori">Semua Kategori</option>
-            <option value="Alat Tulis">Alat Tulis</option>
-            <option value="Makanan">Makanan</option>
-            <option value="Minuman">Minuman</option>
-            <option value="Lainnya">Lainnya</option>
+            {categoryNames.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -523,10 +538,11 @@ export const ProductList: React.FC<ProductListProps> = ({
                         : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
                     }`}
                   >
-                    <option value="Minuman">Minuman</option>
-                    <option value="Makanan">Makanan</option>
-                    <option value="Alat Tulis">Alat Tulis</option>
-                    <option value="Lainnya">Lainnya</option>
+                    {categoryNames.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

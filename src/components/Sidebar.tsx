@@ -38,6 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: lowStockCount > 0 ? `${lowStockCount}` : undefined 
     },
     { id: 'riwayat' as ActiveTab, label: 'Riwayat Penjualan', icon: 'receipt_long' },
+    { id: 'pelanggan' as ActiveTab, label: 'Pelanggan & Member', icon: 'group' },
+    { id: 'promo' as ActiveTab, label: 'Diskon & Promo', icon: 'local_offer' },
     { id: 'laporan' as ActiveTab, label: 'Laporan', icon: 'analytics' },
     { id: 'pengaturan' as ActiveTab, label: 'Pengaturan', icon: 'settings' },
     { id: 'admin' as ActiveTab, label: 'Admin Pusat (Multi-Toko)', icon: 'admin_panel_settings', badge: 'Admin' }

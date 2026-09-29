@@ -27,6 +27,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Login form state
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
@@ -35,6 +36,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regStoreName, setRegStoreName] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regCategory, setRegCategory] = useState('Retail & Minimarket');
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState('');
@@ -43,6 +45,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  const [searchUserQuery, setSearchUserQuery] = useState('');
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   // Synchronize initialTab if changed
   useEffect(() => {
@@ -134,6 +138,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     navigator.clipboard.writeText(url);
     setCopiedSlug(slug);
     setTimeout(() => setCopiedSlug(null), 2500);
+  };
+
+  const handleDeleteUser = async (userId: string, username: string) => {
+    if (userId === 'usr-admin' || username === 'admin') {
+      alert('Akun Administrator Utama tidak boleh dihapus.');
+      return;
+    }
+    if (!window.confirm(`Yakin ingin menghapus akun toko @${username}? Data produk dan transaksi toko ini akan dihapus.`)) {
+      return;
+    }
+    setDeletingUserId(userId);
+    try {
+      await api.deleteUser(userId);
+      setAllUsers((prev) => prev.filter((u) => u.id !== userId));
+    } catch (err: any) {
+      alert(err.message || 'Gagal menghapus akun pengguna');
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  const handleSwitchStore = (user: User) => {
+    onLoginSuccess(user);
+    onClose();
   };
 
   // Preview generated URL for registration
@@ -319,16 +347,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </span>
                     <input
                       id="input-login-password"
-                      type="password"
+                      type={showLoginPassword ? 'text' : 'password'}
                       placeholder="Masukkan kata sandi"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 ${
+                      className={`w-full pl-9 pr-10 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 ${
                         isDark
                           ? 'bg-slate-900 border-slate-700 focus:ring-blue-500 text-slate-100 placeholder:text-slate-500'
                           : 'bg-white border-slate-300 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400'
                       }`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {showLoginPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -533,18 +570,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <label className="block text-xs font-semibold text-slate-400 mb-1">
                       Password Akun
                     </label>
-                    <input
-                      id="input-reg-password"
-                      type="password"
-                      placeholder="Minimal 4 karakter"
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 ${
-                        isDark
-                          ? 'bg-slate-950/50 border-sky-400/20 focus:ring-sky-400 text-slate-100'
-                          : 'bg-white border-slate-200 focus:ring-blue-500 text-slate-800'
-                      }`}
-                    />
+                    <div className="relative">
+                      <input
+                        id="input-reg-password"
+                        type={showRegPassword ? 'text' : 'password'}
+                        placeholder="Minimal 4 karakter"
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        className={`w-full pl-3 pr-10 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 ${
+                          isDark
+                            ? 'bg-slate-950/50 border-sky-400/20 focus:ring-sky-400 text-slate-100'
+                            : 'bg-white border-slate-200 focus:ring-blue-500 text-slate-800'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {showRegPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -578,11 +626,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   id="btn-refresh-user-list"
                   onClick={loadUsers}
                   disabled={loadingUsers}
-                  className="text-xs text-sky-400 hover:underline flex items-center gap-1"
+                  className="text-xs text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[14px]">refresh</span>
                   Segarkan
                 </button>
+              </div>
+
+              {/* User search bar */}
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-slate-400">
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Cari toko atau username pengguna..."
+                  value={searchUserQuery}
+                  onChange={(e) => setSearchUserQuery(e.target.value)}
+                  className={`w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none ${
+                    isDark
+                      ? 'bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-500'
+                      : 'bg-white border-slate-200 text-slate-700 placeholder:text-slate-400'
+                  }`}
+                />
               </div>
 
               {loadingUsers ? (
@@ -594,10 +660,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Belum ada pengguna terdaftar.
                 </div>
               ) : (
-                <div className="space-y-2.5">
-                  {allUsers.map((usr) => {
+                <div className="space-y-2.5 max-h-96 overflow-y-auto">
+                  {allUsers
+                    .filter((usr) => {
+                      if (!searchUserQuery) return true;
+                      const q = searchUserQuery.toLowerCase();
+                      return (
+                        usr.storeName.toLowerCase().includes(q) ||
+                        usr.username.toLowerCase().includes(q) ||
+                        usr.name.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((usr) => {
                     const isCurrent = currentUser?.username === usr.username;
-                    const uniqueUrl = `${window.location.origin}${window.location.pathname}?u=${usr.slug}`;
+                    const isPrimaryAdmin = usr.username === 'admin' || usr.id === 'usr-admin';
 
                     return (
                       <div
@@ -642,23 +718,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             </div>
                           </div>
 
-                          <button
-                            id={`btn-copy-link-${usr.slug}`}
-                            onClick={() => handleCopyUniqueLink(usr.slug)}
-                            title="Salin tautan unik toko ini"
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-colors ${
-                              copiedSlug === usr.slug
-                                ? 'bg-emerald-600 text-white border-emerald-600'
-                                : isDark
-                                ? 'bg-slate-900 border-sky-400/20 text-sky-300 hover:bg-sky-950'
-                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-[14px]">
-                              {copiedSlug === usr.slug ? 'check' : 'content_copy'}
-                            </span>
-                            <span>{copiedSlug === usr.slug ? 'Tersalin!' : 'Salin URL'}</span>
-                          </button>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {!isCurrent && (
+                              <button
+                                onClick={() => handleSwitchStore(usr)}
+                                title="Beralih ke toko ini"
+                                className="px-2 py-1 rounded text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
+                              >
+                                Buka Toko
+                              </button>
+                            )}
+
+                            <button
+                              id={`btn-copy-link-${usr.slug}`}
+                              onClick={() => handleCopyUniqueLink(usr.slug)}
+                              title="Salin tautan unik toko ini"
+                              className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-colors cursor-pointer ${
+                                copiedSlug === usr.slug
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : isDark
+                                  ? 'bg-slate-900 border-sky-400/20 text-sky-300 hover:bg-sky-950'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[14px]">
+                                {copiedSlug === usr.slug ? 'check' : 'content_copy'}
+                              </span>
+                              <span>{copiedSlug === usr.slug ? 'Tersalin' : 'URL'}</span>
+                            </button>
+
+                            {!isPrimaryAdmin && (
+                              <button
+                                onClick={() => handleDeleteUser(usr.id, usr.username)}
+                                disabled={deletingUserId === usr.id}
+                                title="Hapus akun toko ini"
+                                className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Store unique page link info */}
@@ -673,7 +772,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             onClick={() => {
                               window.location.search = `?u=${usr.slug}`;
                             }}
-                            className="text-sky-400 hover:underline flex items-center gap-0.5 text-[10px] ml-2 flex-shrink-0"
+                            className="text-sky-400 hover:underline flex items-center gap-0.5 text-[10px] ml-2 flex-shrink-0 cursor-pointer"
                           >
                             <span>Buka Halaman</span>
                             <span className="material-symbols-outlined text-[12px]">

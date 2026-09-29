@@ -1,4 +1,4 @@
-import { Product, Transaction, User } from '../types';
+import { Product, Transaction, User, CategoryItem, Customer, Promo, StockLog } from '../types';
 
 export interface DatabaseStatus {
   status: 'connected' | 'error' | 'connecting';
@@ -125,6 +125,62 @@ export const api = {
     return data;
   },
 
+  async deleteUser(id: string): Promise<void> {
+    const res = await fetch(`/api/auth/users/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Gagal menghapus akun pengguna');
+    }
+  },
+
+  // Categories (scoped by store slug)
+  async getCategories(slug: string = 'admin'): Promise<CategoryItem[]> {
+    const res = await fetch(`/api/categories?slug=${encodeURIComponent(slug)}`);
+    if (!res.ok) throw new Error('Gagal memuat kategori dari server');
+    return await res.json();
+  },
+
+  async createCategory(
+    category: Omit<CategoryItem, 'id'> & { id?: string },
+    slug: string = 'admin'
+  ): Promise<CategoryItem> {
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...category, storeSlug: slug })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal menambahkan kategori baru');
+    return data;
+  },
+
+  async updateCategory(category: CategoryItem, oldName?: string): Promise<CategoryItem> {
+    const res = await fetch(`/api/categories/${category.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...category, oldName })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal memperbarui kategori');
+    return data;
+  },
+
+  async deleteCategory(id: string, fallbackCategory?: string, storeSlug?: string): Promise<void> {
+    const params = new URLSearchParams();
+    if (fallbackCategory) params.set('fallbackCategory', fallbackCategory);
+    if (storeSlug) params.set('storeSlug', storeSlug);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/api/categories/${id}${qs}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Gagal menghapus kategori');
+    }
+  },
+
   // Products (scoped by store slug)
   async getProducts(slug: string = 'admin'): Promise<Product[]> {
     const res = await fetch(`/api/products?slug=${encodeURIComponent(slug)}`);
@@ -190,6 +246,129 @@ export const api = {
     });
     if (!res.ok) throw new Error('Gagal memproses transaksi ke Turso');
     return await res.json();
+  },
+
+  async updateTransaction(tx: Partial<Transaction> & { id: string }): Promise<Transaction> {
+    const res = await fetch(`/api/transactions/${tx.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tx)
+    });
+    if (!res.ok) throw new Error('Gagal memperbarui transaksi di Turso');
+    return await res.json();
+  },
+
+  async deleteTransaction(id: string, restock: boolean = false): Promise<void> {
+    const res = await fetch(`/api/transactions/${id}?restock=${restock ? 'true' : 'false'}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Gagal membatalkan transaksi di Turso');
+  },
+
+  // Customers CRUD
+  async getCustomers(slug: string = 'admin'): Promise<Customer[]> {
+    const res = await fetch(`/api/customers?slug=${encodeURIComponent(slug)}`);
+    if (!res.ok) throw new Error('Gagal memuat pelanggan dari Turso');
+    return await res.json();
+  },
+
+  async createCustomer(
+    customer: Omit<Customer, 'id'> & { id?: string },
+    slug: string = 'admin'
+  ): Promise<Customer> {
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...customer, storeSlug: slug })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal menambahkan pelanggan');
+    return data;
+  },
+
+  async updateCustomer(customer: Customer): Promise<Customer> {
+    const res = await fetch(`/api/customers/${customer.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(customer)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal memperbarui pelanggan');
+    return data;
+  },
+
+  async deleteCustomer(id: string): Promise<void> {
+    const res = await fetch(`/api/customers/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Gagal menghapus pelanggan dari Turso');
+  },
+
+  // Promos CRUD
+  async getPromos(slug: string = 'admin'): Promise<Promo[]> {
+    const res = await fetch(`/api/promos?slug=${encodeURIComponent(slug)}`);
+    if (!res.ok) throw new Error('Gagal memuat promo dari Turso');
+    return await res.json();
+  },
+
+  async createPromo(
+    promo: Omit<Promo, 'id'> & { id?: string },
+    slug: string = 'admin'
+  ): Promise<Promo> {
+    const res = await fetch('/api/promos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...promo, storeSlug: slug })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal menambahkan kupon promo');
+    return data;
+  },
+
+  async updatePromo(promo: Promo): Promise<Promo> {
+    const res = await fetch(`/api/promos/${promo.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(promo)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal memperbarui kupon promo');
+    return data;
+  },
+
+  async deletePromo(id: string): Promise<void> {
+    const res = await fetch(`/api/promos/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Gagal menghapus kupon promo dari Turso');
+  },
+
+  // Stock Logs CRUD
+  async getStockLogs(slug: string = 'admin'): Promise<StockLog[]> {
+    const res = await fetch(`/api/stock-logs?slug=${encodeURIComponent(slug)}`);
+    if (!res.ok) throw new Error('Gagal memuat log mutasi stok');
+    return await res.json();
+  },
+
+  async createStockLog(
+    log: Omit<StockLog, 'id'> & { id?: string },
+    slug: string = 'admin'
+  ): Promise<StockLog> {
+    const res = await fetch('/api/stock-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...log, storeSlug: slug })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal mencatat mutasi stok');
+    return data;
+  },
+
+  async deleteStockLog(id: string): Promise<void> {
+    const res = await fetch(`/api/stock-logs/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Gagal menghapus log stok');
   },
 
   async resetDatabase(): Promise<void> {

@@ -1,10 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Product, CartItem, CategoryType, AppTheme, PaymentMethod, Transaction } from '../types';
+import { Product, CartItem, CategoryType, AppTheme, PaymentMethod, Transaction, CategoryItem, Customer, Promo } from '../types';
 import { formatRupiah, parseRupiahInput } from '../utils/formatters';
 import { playScannerBeep } from '../utils/scannerSound';
 
 interface CashierViewProps {
   products: Product[];
+  categoriesList?: CategoryItem[];
+  customers?: Customer[];
+  promos?: Promo[];
   cart: CartItem[];
   onAddToCart: (product: Product) => void;
   onUpdateCartQty: (productId: string, quantity: number) => void;
@@ -19,6 +22,7 @@ interface CashierViewProps {
     paymentMethod: PaymentMethod;
     amountPaid: number;
     change: number;
+    customerName?: string;
   }) => Transaction;
   theme: AppTheme;
   searchQuery?: string;
@@ -26,6 +30,9 @@ interface CashierViewProps {
 
 export const CashierView: React.FC<CashierViewProps> = ({
   products,
+  categoriesList,
+  customers = [],
+  promos = [],
   cart,
   onAddToCart,
   onUpdateCartQty,
@@ -45,6 +52,11 @@ export const CashierView: React.FC<CashierViewProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tunai');
   const [checkoutSuccessTx, setCheckoutSuccessTx] = useState<Transaction | null>(null);
   const [paymentError, setPaymentError] = useState<string>('');
+
+  // Customer & Promo States
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [selectedPromoCode, setSelectedPromoCode] = useState<string>('');
 
   // Barcode Scanner States
   const [isBeepEnabled, setIsBeepEnabled] = useState<boolean>(() => {
@@ -92,7 +104,16 @@ export const CashierView: React.FC<CashierViewProps> = ({
     });
   };
 
-  const categories: string[] = ['Semua', 'Alat Tulis', 'Makanan', 'Minuman', 'Lainnya'];
+  const categories: string[] = useMemo(() => {
+    if (categoriesList && categoriesList.length > 0) {
+      return ['Semua', ...categoriesList.map((c) => c.name)];
+    }
+    const set = new Set<string>(['Alat Tulis', 'Makanan', 'Minuman', 'Lainnya']);
+    products.forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
+    return ['Semua', ...Array.from(set)];
+  }, [categoriesList, products]);
 
   // Combined search query
   const query = (searchQuery || localSearch).toLowerCase().trim();
@@ -236,6 +257,8 @@ export const CashierView: React.FC<CashierViewProps> = ({
 
     setPaymentError('');
 
+    const selectedCust = customers.find((c) => c.id === selectedCustomerId);
+
     const tx = onCheckout({
       items: cart.map((i) => ({ product: i.product, quantity: i.quantity })),
       subtotal,
@@ -244,7 +267,8 @@ export const CashierView: React.FC<CashierViewProps> = ({
       total,
       paymentMethod,
       amountPaid: paymentMethod === 'Tunai' ? numericCashGiven : total,
-      change: paymentMethod === 'Tunai' ? change : 0
+      change: paymentMethod === 'Tunai' ? change : 0,
+      customerName: selectedCust ? selectedCust.name : undefined
     });
 
     setCheckoutSuccessTx(tx);
@@ -615,6 +639,30 @@ export const CashierView: React.FC<CashierViewProps> = ({
           )}
         </div>
 
+        {/* Customer Selector Strip */}
+        <div className={`px-4 py-2 border-b flex items-center justify-between gap-2 text-xs shrink-0 ${
+          isDark ? 'bg-[#0f172a] border-slate-800' : 'bg-slate-50 border-slate-200'
+        }`}>
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <span className="material-symbols-outlined text-[16px]">person</span>
+            <span className="font-semibold text-[11px]">Pelanggan:</span>
+          </div>
+          <select
+            value={selectedCustomerId}
+            onChange={(e) => setSelectedCustomerId(e.target.value)}
+            className={`flex-1 max-w-[220px] text-xs py-1 px-2 rounded-lg border outline-none font-semibold truncate cursor-pointer ${
+              isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+            }`}
+          >
+            <option value="">Pelanggan Umum (Walk-in)</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.memberLevel} • {c.points} pts)
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Cart Items List */}
         <div
           id="cart-items-container"
@@ -734,9 +782,21 @@ export const CashierView: React.FC<CashierViewProps> = ({
             </span>
           </div>
 
-          {/* Diskon */}
+          {/* Diskon & Voucher Promo Button */}
           <div className="flex justify-between items-center text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            <span>Diskon</span>
+            <div className="flex items-center gap-1.5">
+              <span>Diskon</span>
+              {promos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsPromoModalOpen(true)}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-200 cursor-pointer flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[12px]">local_offer</span>
+                  <span>{selectedPromoCode ? selectedPromoCode : 'Kupon'}</span>
+                </button>
+              )}
+            </div>
             <div className="flex items-center border border-slate-300 dark:border-slate-700 rounded-md w-32 bg-white dark:bg-slate-900 px-2 py-1">
               <span className="text-xs text-slate-400 mr-1">Rp</span>
               <input
@@ -745,7 +805,10 @@ export const CashierView: React.FC<CashierViewProps> = ({
                 min="0"
                 value={discountAmount || ''}
                 placeholder="0"
-                onChange={(e) => setDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+                onChange={(e) => {
+                  setDiscountAmount(Math.max(0, Number(e.target.value) || 0));
+                  setSelectedPromoCode('');
+                }}
                 className="w-full text-right text-xs font-semibold outline-none bg-transparent"
               />
             </div>
@@ -1209,6 +1272,111 @@ export const CashierView: React.FC<CashierViewProps> = ({
                 Transaksi Baru
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promo Voucher Selection Modal */}
+      {isPromoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div
+            className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${
+              isDark ? 'bg-[#0f172a] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className={`px-5 py-4 border-b flex justify-between items-center ${isDark ? 'border-slate-800 bg-[#141e33]' : 'border-slate-100 bg-slate-50'}`}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-500">local_offer</span>
+                <h3 className="font-bold text-sm">Pilih Voucher Diskon Promo</h3>
+              </div>
+              <button onClick={() => setIsPromoModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
+              {promos.filter((p) => p.isActive).length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">
+                  Tidak ada voucher promo aktif saat ini. Anda dapat membuat promo baru di menu Diskon &amp; Promo.
+                </p>
+              ) : (
+                promos
+                  .filter((p) => p.isActive)
+                  .map((p) => {
+                    const isEligible = subtotal >= p.minSpend;
+                    const calculatedDisc = p.type === 'percentage'
+                      ? Math.round((subtotal * p.value) / 100)
+                      : p.value;
+
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          if (!isEligible) return;
+                          setDiscountAmount(calculatedDisc);
+                          setSelectedPromoCode(p.code);
+                          setIsPromoModalOpen(false);
+                        }}
+                        className={`p-3 rounded-xl border transition-all ${
+                          !isEligible
+                            ? 'opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                            : 'cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 ' +
+                              (selectedPromoCode === p.code
+                                ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40'
+                                : isDark
+                                ? 'bg-slate-900 border-slate-800'
+                                : 'bg-white border-slate-200')
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="font-mono font-extrabold text-xs text-blue-600 dark:text-sky-400 px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950">
+                              {p.code}
+                            </span>
+                            <h4 className="font-bold text-xs mt-1.5">{p.title}</h4>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Min. Belanja: {formatRupiah(p.minSpend)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-extrabold text-amber-600 dark:text-amber-400">
+                              {p.type === 'percentage' ? `${p.value}% OFF` : `-${formatRupiah(p.value)}`}
+                            </span>
+                            {isEligible && (
+                              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                Hemat {formatRupiah(calculatedDisc)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {!isEligible && (
+                          <p className="text-[10px] text-rose-500 font-medium mt-2">
+                            ⚠️ Belum memenuhi minimal belanja {formatRupiah(p.minSpend)} (Kurang {formatRupiah(p.minSpend - subtotal)})
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            {selectedPromoCode && (
+              <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs">
+                <span className="text-slate-400">Voucher terpakai: <strong>{selectedPromoCode}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPromoCode('');
+                    setDiscountAmount(0);
+                    setIsPromoModalOpen(false);
+                  }}
+                  className="text-rose-500 font-bold hover:underline cursor-pointer"
+                >
+                  Lepas Voucher
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

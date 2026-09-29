@@ -1,7 +1,38 @@
-import { Product, Transaction } from '../types';
+import { Product, Transaction, CategoryItem, Customer, Promo, StockLog } from '../types';
 
 export const USER_AVATAR_LIGHT = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBz59inFDaXkQSFLwfIWoDmbUKWHzrOQW4PdzQ37UmvAl5R00W5n2YT6QQHpPcrkM6G2RvPUJsWiFmfOtAUCGq6DhIQOJK3wJxrHcdn6i1pYcASrpoqCiRfse-eywMz4h639k09u0puKqo5hPLIXMzw0a3NLrz05-habUnNAfZVeJdcs0V7y4_z7LJQgyXbQ5BsxcJixl9QIN1kLgl370w0-wwX3vEE_u5unOv8i5RZ0Q8O8hcX9ScOLg';
 export const USER_AVATAR_DARK = 'https://lh3.googleusercontent.com/aida-public/AB6AXuD307Wtg4hA3lgWmU_BWQc7Fbwz_x1JmAzlB4oto-57dzfcipfCzNzMBFZzKMR6hk3OVL_nDwvMmKkcGa6QmNokVFr0_TwTDQPPGEwfaitjoV7tHz4gbk8c-9pK1tgs86dd2Xr9NWQ_0E_Sgd1M26xipV6oxdc-CuHZP7xJdtU-tervU3ZQuvFOLVsPHzVinYcZDkVXOsOd0FRLEwFvBT8TpQUfDCCiJ4Obmo576duRmqaK_muZZEkP8Q';
+
+export const INITIAL_CATEGORIES: CategoryItem[] = [
+  {
+    id: 'cat-1',
+    name: 'Minuman',
+    icon: 'local_cafe',
+    description: 'Kopi, teh, jus buah, dan aneka minuman segar',
+    color: 'emerald'
+  },
+  {
+    id: 'cat-2',
+    name: 'Makanan',
+    icon: 'restaurant',
+    description: 'Croissant, roti panggang, spaghetti, dan snack lezat',
+    color: 'amber'
+  },
+  {
+    id: 'cat-3',
+    name: 'Alat Tulis',
+    icon: 'edit_note',
+    description: 'Buku catatan, pensil, pulpen, penghapus, dan atk kantor',
+    color: 'blue'
+  },
+  {
+    id: 'cat-4',
+    name: 'Lainnya',
+    icon: 'category',
+    description: 'Aksesoris tumbler, tote bag, merchandise dan packaging',
+    color: 'purple'
+  }
+];
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -342,5 +373,149 @@ export const INITIAL_CART = [
   {
     product: INITIAL_PRODUCTS[1], // Pensil 2B Faber Castell
     quantity: 2
+  }
+];
+
+export const INITIAL_CUSTOMERS: Customer[] = [
+  {
+    id: 'cust-1',
+    name: 'Budi Santoso',
+    phone: '081234567890',
+    email: 'budi.santoso@gmail.com',
+    address: 'Jl. Merdeka No. 45, Jakarta',
+    memberLevel: 'VIP',
+    points: 450,
+    totalSpent: 1250000,
+    transactionCount: 8,
+    storeSlug: 'admin',
+    createdAt: '2023-08-15T10:00:00Z'
+  },
+  {
+    id: 'cust-2',
+    name: 'Siti Rahmawati',
+    phone: '082198765432',
+    email: 'siti.rahma@yahoo.com',
+    address: 'Komplek Griya Indah Blok C-12, Bandung',
+    memberLevel: 'Gold',
+    points: 220,
+    totalSpent: 680000,
+    transactionCount: 5,
+    storeSlug: 'admin',
+    createdAt: '2023-09-01T14:30:00Z'
+  },
+  {
+    id: 'cust-3',
+    name: 'Dewi Lestari',
+    phone: '085712344321',
+    email: 'dewi.lestari@gmail.com',
+    address: 'Jl. Surya Kencana No. 8, Bogor',
+    memberLevel: 'Silver',
+    points: 90,
+    totalSpent: 310000,
+    transactionCount: 3,
+    storeSlug: 'admin',
+    createdAt: '2023-09-20T11:15:00Z'
+  },
+  {
+    id: 'cust-4',
+    name: 'Rian Pratama',
+    phone: '087855443322',
+    email: 'rian.pratama@outlook.com',
+    address: 'Jl. Sudirman Kav 21, Surabaya',
+    memberLevel: 'Reguler',
+    points: 30,
+    totalSpent: 125000,
+    transactionCount: 1,
+    storeSlug: 'admin',
+    createdAt: '2023-10-10T09:20:00Z'
+  }
+];
+
+export const INITIAL_PROMOS: Promo[] = [
+  {
+    id: 'prm-1',
+    code: 'DISKON10',
+    title: 'Diskon Belanja Hemat 10%',
+    type: 'percentage',
+    value: 10,
+    minSpend: 50000,
+    isActive: true,
+    storeSlug: 'admin',
+    createdAt: '2023-09-01T00:00:00Z'
+  },
+  {
+    id: 'prm-2',
+    code: 'POTONG15RB',
+    title: 'Potongan Langsung Rp 15.000',
+    type: 'fixed',
+    value: 15000,
+    minSpend: 100000,
+    isActive: true,
+    storeSlug: 'admin',
+    createdAt: '2023-09-10T00:00:00Z'
+  },
+  {
+    id: 'prm-3',
+    code: 'SUPERVIP',
+    title: 'Spesial Member VIP 20%',
+    type: 'percentage',
+    value: 20,
+    minSpend: 150000,
+    isActive: true,
+    storeSlug: 'admin',
+    createdAt: '2023-09-15T00:00:00Z'
+  },
+  {
+    id: 'prm-4',
+    code: 'PROMOHEMAT',
+    title: 'Potongan Rp 5.000 Tanpa Syarat Min',
+    type: 'fixed',
+    value: 5000,
+    minSpend: 20000,
+    isActive: false,
+    storeSlug: 'admin',
+    createdAt: '2023-10-01T00:00:00Z'
+  }
+];
+
+export const INITIAL_STOCK_LOGS: StockLog[] = [
+  {
+    id: 'log-1',
+    productId: 'prod-1',
+    productName: 'Buku Tulis Sidu 38 Lembar',
+    type: 'in',
+    quantity: 50,
+    previousStock: 0,
+    newStock: 50,
+    reason: 'Restock dari Supplier Utama',
+    dateFormatted: '20 Okt 2023, 09:00',
+    timestamp: '2023-10-20T09:00:00Z',
+    storeSlug: 'admin'
+  },
+  {
+    id: 'log-2',
+    productId: 'prod-5',
+    productName: 'Kopi Susu Gula Aren',
+    type: 'in',
+    quantity: 150,
+    previousStock: 0,
+    newStock: 150,
+    reason: 'Produksi Harian Minuman Segar',
+    dateFormatted: '21 Okt 2023, 07:30',
+    timestamp: '2023-10-21T07:30:00Z',
+    storeSlug: 'admin'
+  },
+  {
+    id: 'log-3',
+    productId: 'prod-4',
+    productName: 'Penghapus Joyko 52B',
+    type: 'adjustment',
+    quantity: 5,
+    previousStock: 80,
+    newStock: 85,
+    reason: 'Koreksi Stok Opname Fisik Toko',
+    dateFormatted: '22 Okt 2023, 14:15',
+    timestamp: '2023-10-22T14:15:00Z',
+    storeSlug: 'admin'
   }
 ];

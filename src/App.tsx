@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ActiveTab, AppTheme, Product, CartItem, Transaction, PaymentMethod, User } from './types';
-import { INITIAL_PRODUCTS, INITIAL_TRANSACTIONS, INITIAL_CART } from './data/mockData';
+import { ActiveTab, AppTheme, Product, CartItem, Transaction, PaymentMethod, User, CategoryItem, Customer, Promo, StockLog } from './types';
+import { INITIAL_PRODUCTS, INITIAL_TRANSACTIONS, INITIAL_CART, INITIAL_CATEGORIES, INITIAL_CUSTOMERS, INITIAL_PROMOS, INITIAL_STOCK_LOGS } from './data/mockData';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -14,6 +14,8 @@ import { ProductList } from './components/ProductList';
 import { CategoryView } from './components/CategoryView';
 import { InventoryView } from './components/InventoryView';
 import { SalesHistoryView } from './components/SalesHistoryView';
+import { CustomerView } from './components/CustomerView';
+import { PromoView } from './components/PromoView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { PrintableReceipt } from './components/PrintableReceipt';
@@ -107,6 +109,8 @@ export default function App() {
         'kategori',
         'stok',
         'riwayat',
+        'pelanggan',
+        'promo',
         'laporan',
         'pengaturan',
         'admin'
@@ -172,6 +176,58 @@ export default function App() {
   // Printable transaction
   const [printableTx, setPrintableTx] = useState<Transaction | null>(null);
 
+  // Categories state (scoped per store slug)
+  const [categories, setCategories] = useState<CategoryItem[]>(() => {
+    const saved = localStorage.getItem(`kasirku_categories_${currentSlug}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse cached categories', e);
+      }
+    }
+    return INITIAL_CATEGORIES;
+  });
+
+  // Customers state (scoped per store slug)
+  const [customers, setCustomers] = useState<Customer[]>(() => {
+    const saved = localStorage.getItem(`kasirku_customers_${currentSlug}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse cached customers', e);
+      }
+    }
+    return currentSlug === 'admin' ? INITIAL_CUSTOMERS : [];
+  });
+
+  // Promos state (scoped per store slug)
+  const [promos, setPromos] = useState<Promo[]>(() => {
+    const saved = localStorage.getItem(`kasirku_promos_${currentSlug}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse cached promos', e);
+      }
+    }
+    return currentSlug === 'admin' ? INITIAL_PROMOS : [];
+  });
+
+  // Stock logs state (scoped per store slug)
+  const [stockLogs, setStockLogs] = useState<StockLog[]>(() => {
+    const saved = localStorage.getItem(`kasirku_stock_logs_${currentSlug}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse cached stock logs', e);
+      }
+    }
+    return currentSlug === 'admin' ? INITIAL_STOCK_LOGS : [];
+  });
+
   // Sync with Turso cloud database for the current store slug
   const refreshDatabase = useCallback(async (slugToFetch: string = currentSlug) => {
     try {
@@ -189,6 +245,30 @@ export default function App() {
         if (remoteTransactions && Array.isArray(remoteTransactions)) {
           setTransactions(remoteTransactions);
           localStorage.setItem(`kasirku_transactions_${slugToFetch}`, JSON.stringify(remoteTransactions));
+        }
+
+        const remoteCategories = await api.getCategories(slugToFetch);
+        if (remoteCategories && Array.isArray(remoteCategories) && remoteCategories.length > 0) {
+          setCategories(remoteCategories);
+          localStorage.setItem(`kasirku_categories_${slugToFetch}`, JSON.stringify(remoteCategories));
+        }
+
+        const remoteCustomers = await api.getCustomers(slugToFetch);
+        if (remoteCustomers && Array.isArray(remoteCustomers) && remoteCustomers.length > 0) {
+          setCustomers(remoteCustomers);
+          localStorage.setItem(`kasirku_customers_${slugToFetch}`, JSON.stringify(remoteCustomers));
+        }
+
+        const remotePromos = await api.getPromos(slugToFetch);
+        if (remotePromos && Array.isArray(remotePromos) && remotePromos.length > 0) {
+          setPromos(remotePromos);
+          localStorage.setItem(`kasirku_promos_${slugToFetch}`, JSON.stringify(remotePromos));
+        }
+
+        const remoteStockLogs = await api.getStockLogs(slugToFetch);
+        if (remoteStockLogs && Array.isArray(remoteStockLogs) && remoteStockLogs.length > 0) {
+          setStockLogs(remoteStockLogs);
+          localStorage.setItem(`kasirku_stock_logs_${slugToFetch}`, JSON.stringify(remoteStockLogs));
         }
 
         // Also fetch official user details if available
@@ -235,10 +315,14 @@ export default function App() {
     }
   }, [theme]);
 
-  // Cache products, cart, transactions per slug
+  // Cache products, cart, transactions, categories per slug
   useEffect(() => {
     localStorage.setItem(`kasirku_products_${currentSlug}`, JSON.stringify(products));
   }, [products, currentSlug]);
+
+  useEffect(() => {
+    localStorage.setItem(`kasirku_categories_${currentSlug}`, JSON.stringify(categories));
+  }, [categories, currentSlug]);
 
   useEffect(() => {
     localStorage.setItem(`kasirku_cart_${currentSlug}`, JSON.stringify(cart));
@@ -247,6 +331,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(`kasirku_transactions_${currentSlug}`, JSON.stringify(transactions));
   }, [transactions, currentSlug]);
+
+  useEffect(() => {
+    localStorage.setItem(`kasirku_customers_${currentSlug}`, JSON.stringify(customers));
+  }, [customers, currentSlug]);
+
+  useEffect(() => {
+    localStorage.setItem(`kasirku_promos_${currentSlug}`, JSON.stringify(promos));
+  }, [promos, currentSlug]);
+
+  useEffect(() => {
+    localStorage.setItem(`kasirku_stock_logs_${currentSlug}`, JSON.stringify(stockLogs));
+  }, [stockLogs, currentSlug]);
 
   // Low stock counter
   const lowStockCount = products.filter((p) => p.stock <= 5).length;
@@ -422,14 +518,217 @@ export default function App() {
       .catch((err) => console.warn('Turso update stock warning:', err));
   };
 
+  // Category CRUD with Turso Cloud Sync (scoped by current store slug)
+  const handleAddCategory = async (catData: Omit<CategoryItem, 'id'>) => {
+    try {
+      const created = await api.createCategory(catData, currentSlug);
+      setCategories((prev) => [...prev, created]);
+    } catch (e: any) {
+      const fallbackItem: CategoryItem = {
+        id: `cat-${Date.now()}`,
+        ...catData,
+        storeSlug: currentSlug
+      };
+      setCategories((prev) => [...prev, fallbackItem]);
+    }
+  };
+
+  const handleUpdateCategory = async (cat: CategoryItem, oldName?: string) => {
+    try {
+      const updated = await api.updateCategory(cat, oldName);
+      setCategories((prev) => prev.map((c) => (c.id === cat.id ? updated : c)));
+      if (oldName && oldName !== cat.name) {
+        setProducts((prev) =>
+          prev.map((p) => (p.category === oldName ? { ...p, category: cat.name } : p))
+        );
+      }
+    } catch (e) {
+      setCategories((prev) => prev.map((c) => (c.id === cat.id ? cat : c)));
+      if (oldName && oldName !== cat.name) {
+        setProducts((prev) =>
+          prev.map((p) => (p.category === oldName ? { ...p, category: cat.name } : p))
+        );
+      }
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, fallbackCategory: string = 'Lainnya') => {
+    const catToDelete = categories.find((c) => c.id === id);
+    try {
+      await api.deleteCategory(id, fallbackCategory, currentSlug);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      if (catToDelete) {
+        setProducts((prev) =>
+          prev.map((p) => (p.category === catToDelete.name ? { ...p, category: fallbackCategory } : p))
+        );
+      }
+    } catch (e) {
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      if (catToDelete) {
+        setProducts((prev) =>
+          prev.map((p) => (p.category === catToDelete.name ? { ...p, category: fallbackCategory } : p))
+        );
+      }
+    }
+  };
+
+  // Transactions CRUD (Create manual, Update status/notes, Delete/Void with restock)
+  const handleAddTransaction = async (txData: Omit<Transaction, 'id'>) => {
+    const newId = `TRX-${Date.now().toString().slice(-6)}`;
+    const newTx: Transaction = { ...txData, id: newId };
+    setTransactions((prev) => [newTx, ...prev]);
+
+    try {
+      await api.createTransaction(newTx, currentSlug);
+      api.getStatus().then((s) => setDbStatus(s)).catch(() => {});
+    } catch (e) {
+      console.warn('Transaction saved locally:', e);
+    }
+    return newTx;
+  };
+
+  const handleUpdateTransaction = async (updated: Partial<Transaction> & { id: string }) => {
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
+    );
+
+    try {
+      await api.updateTransaction(updated);
+    } catch (e) {
+      console.warn('Update transaction saved locally:', e);
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string, restock: boolean = false) => {
+    const tx = transactions.find((t) => t.id === id);
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+
+    // If restock requested, return stock locally as well
+    if (restock && tx && Array.isArray(tx.items)) {
+      setProducts((prev) =>
+        prev.map((p) => {
+          const matchedItem = tx.items.find((i) => i.productId === p.id);
+          if (matchedItem) {
+            return { ...p, stock: p.stock + matchedItem.quantity };
+          }
+          return p;
+        })
+      );
+    }
+
+    try {
+      await api.deleteTransaction(id, restock);
+      api.getStatus().then((s) => setDbStatus(s)).catch(() => {});
+    } catch (e) {
+      console.warn('Delete transaction saved locally:', e);
+    }
+  };
+
+  // Customers CRUD
+  const handleAddCustomer = async (custData: Omit<Customer, 'id'>) => {
+    const newId = `cust-${Date.now()}`;
+    const newCustomer: Customer = { ...custData, id: newId, storeSlug: currentSlug };
+    setCustomers((prev) => [newCustomer, ...prev]);
+
+    try {
+      await api.createCustomer(newCustomer, currentSlug);
+    } catch (e) {
+      console.warn('Customer saved locally:', e);
+    }
+  };
+
+  const handleUpdateCustomer = async (updated: Customer) => {
+    setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+
+    try {
+      await api.updateCustomer(updated);
+    } catch (e) {
+      console.warn('Update customer saved locally:', e);
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+
+    try {
+      await api.deleteCustomer(id);
+    } catch (e) {
+      console.warn('Delete customer saved locally:', e);
+    }
+  };
+
+  // Promos CRUD
+  const handleAddPromo = async (promoData: Omit<Promo, 'id'>) => {
+    const newId = `prm-${Date.now()}`;
+    const newPromo: Promo = { ...promoData, id: newId, storeSlug: currentSlug };
+    setPromos((prev) => [newPromo, ...prev]);
+
+    try {
+      await api.createPromo(newPromo, currentSlug);
+    } catch (e) {
+      console.warn('Promo saved locally:', e);
+    }
+  };
+
+  const handleUpdatePromo = async (updated: Promo) => {
+    setPromos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+
+    try {
+      await api.updatePromo(updated);
+    } catch (e) {
+      console.warn('Update promo saved locally:', e);
+    }
+  };
+
+  const handleDeletePromo = async (id: string) => {
+    setPromos((prev) => prev.filter((p) => p.id !== id));
+
+    try {
+      await api.deletePromo(id);
+    } catch (e) {
+      console.warn('Delete promo saved locally:', e);
+    }
+  };
+
+  // Stock Logs CRUD
+  const handleAddStockLog = async (logData: Omit<StockLog, 'id'>) => {
+    const newId = `log-${Date.now()}`;
+    const newLog: StockLog = { ...logData, id: newId, storeSlug: currentSlug };
+    setStockLogs((prev) => [newLog, ...prev]);
+
+    try {
+      await api.createStockLog(newLog, currentSlug);
+    } catch (e) {
+      console.warn('Stock log saved locally:', e);
+    }
+  };
+
+  const handleDeleteStockLog = async (id: string) => {
+    setStockLogs((prev) => prev.filter((l) => l.id !== id));
+
+    try {
+      await api.deleteStockLog(id);
+    } catch (e) {
+      console.warn('Delete stock log saved locally:', e);
+    }
+  };
+
   // Reset to initial demo data
   const handleResetData = async () => {
     localStorage.removeItem(`kasirku_products_${currentSlug}`);
     localStorage.removeItem(`kasirku_cart_${currentSlug}`);
     localStorage.removeItem(`kasirku_transactions_${currentSlug}`);
+    localStorage.removeItem(`kasirku_categories_${currentSlug}`);
+    localStorage.removeItem(`kasirku_customers_${currentSlug}`);
+    localStorage.removeItem(`kasirku_promos_${currentSlug}`);
+    localStorage.removeItem(`kasirku_stock_logs_${currentSlug}`);
     setProducts(INITIAL_PRODUCTS);
     setCart(INITIAL_CART);
     setTransactions(INITIAL_TRANSACTIONS);
+    setCategories(INITIAL_CATEGORIES);
+    setCustomers(INITIAL_CUSTOMERS);
+    setPromos(INITIAL_PROMOS);
+    setStockLogs(INITIAL_STOCK_LOGS);
 
     try {
       await api.resetDatabase();
@@ -480,7 +779,7 @@ export default function App() {
             setHeaderSearch('');
           }}
           onSearchChange={
-            ['kasir', 'produk', 'stok', 'riwayat'].includes(activeTab)
+            ['kasir', 'produk', 'stok', 'riwayat', 'pelanggan', 'promo'].includes(activeTab)
               ? setHeaderSearch
               : undefined
           }
@@ -489,6 +788,10 @@ export default function App() {
               ? 'Cari produk atau SKU di kasir...'
               : activeTab === 'riwayat'
               ? 'Cari riwayat transaksi...'
+              : activeTab === 'pelanggan'
+              ? 'Cari nama, no. HP, email pelanggan...'
+              : activeTab === 'promo'
+              ? 'Cari kode voucher kupon promo...'
               : 'Cari produk, SKU...'
           }
         />
@@ -563,6 +866,9 @@ export default function App() {
           {activeTab === 'kasir' && (
             <CashierView
               products={products}
+              categoriesList={categories}
+              customers={customers}
+              promos={promos}
               cart={cart}
               onAddToCart={handleAddToCart}
               onUpdateCartQty={handleUpdateCartQty}
@@ -577,6 +883,7 @@ export default function App() {
           {activeTab === 'produk' && (
             <ProductList
               products={products}
+              categories={categories}
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
@@ -587,26 +894,62 @@ export default function App() {
           {activeTab === 'kategori' && (
             <CategoryView
               products={products}
+              categories={categories}
               theme={theme}
               onNavigateToProducts={(category) => {
                 setActiveTab('produk');
               }}
+              onAddCategory={handleAddCategory}
+              onUpdateCategory={handleUpdateCategory}
+              onDeleteCategory={handleDeleteCategory}
             />
           )}
 
           {activeTab === 'stok' && (
             <InventoryView
               products={products}
+              categories={categories}
+              stockLogs={stockLogs}
               onUpdateStock={handleUpdateStock}
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
+              onAddStockLog={handleAddStockLog}
+              onDeleteStockLog={handleDeleteStockLog}
               theme={theme}
             />
           )}
 
           {activeTab === 'riwayat' && (
-            <SalesHistoryView transactions={transactions} theme={theme} />
+            <SalesHistoryView
+              transactions={transactions}
+              products={products}
+              customers={customers}
+              theme={theme}
+              onCreateTransaction={handleAddTransaction}
+              onUpdateTransaction={handleUpdateTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
+            />
+          )}
+
+          {activeTab === 'pelanggan' && (
+            <CustomerView
+              customers={customers}
+              theme={theme}
+              onAddCustomer={handleAddCustomer}
+              onUpdateCustomer={handleUpdateCustomer}
+              onDeleteCustomer={handleDeleteCustomer}
+            />
+          )}
+
+          {activeTab === 'promo' && (
+            <PromoView
+              promos={promos}
+              theme={theme}
+              onAddPromo={handleAddPromo}
+              onUpdatePromo={handleUpdatePromo}
+              onDeletePromo={handleDeletePromo}
+            />
           )}
 
           {activeTab === 'laporan' && (
